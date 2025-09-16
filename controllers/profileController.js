@@ -24,13 +24,26 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
+
+    // Read current serviceType to enforce rules
+    const current = await User.findById(userId).select('serviceType');
+    if (!current) return res.status(404).json({ errors: { user: 'User not found' } });
+
     let { bio, profilePic, coverImage, phone, website } = req.body;
 
-    // Normalize website to include protocol if provided
-    if (typeof website === 'string' && website.trim() !== '') {
-      website = website.startsWith('http://') || website.startsWith('https://')
-        ? website.trim()
-        : `https://${website.trim()}`;
+    // If the user is not a posting account, ignore phone, website, and cover updates
+    if (current.serviceType !== 'posting') {
+      phone = undefined;
+      website = undefined;
+      coverImage = undefined;
+    } else {
+      // Normalize website to include protocol if provided
+      if (typeof website === 'string' && website.trim() !== '') {
+        website =
+          website.startsWith('http://') || website.startsWith('https://')
+            ? website.trim()
+            : `https://${website.trim()}`;
+      }
     }
 
     const update = { bio, profilePic, coverImage, phone, website };

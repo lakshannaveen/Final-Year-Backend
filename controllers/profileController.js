@@ -25,13 +25,17 @@ exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const { bio, profilePic, coverImage, phone, website } = req.body;
+
     const update = { bio, profilePic, coverImage, phone, website };
-    for (let key in update) if (update[key] === undefined) delete update[key];
-    const user = await User.findByIdAndUpdate(
-      userId,
-      update,
-      { new: true, runValidators: true }
-    ).select('-password');
+    for (const key in update) {
+      if (update[key] === undefined) delete update[key];
+    }
+
+    const user = await User.findByIdAndUpdate(userId, update, {
+      new: true,
+      runValidators: true,
+    }).select('-password');
+
     res.status(200).json({ user });
   } catch (err) {
     res.status(500).json({ errors: { server: 'Server error' } });
@@ -44,32 +48,33 @@ exports.uploadImage = async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ errors: { image: 'No image uploaded' } });
 
-    // Authorize with Backblaze B2
-    await b2.authorize();
-    
-    // Get upload URL
+    // Authorize with Backblaze B2 and get the correct download URL for your account/cluster
+    const auth = await b2.authorize();
+    const downloadUrl = auth.data.downloadUrl; // e.g., https://f003.backblazeb2.com
+
+    // Get upload URL for the target bucket
     const uploadUrlResponse = await b2.getUploadUrl({
-      bucketId: process.env.B2_BUCKET_ID
+      bucketId: process.env.B2_BUCKET_ID,
     });
-    
+
     const uploadUrl = uploadUrlResponse.data.uploadUrl;
     const uploadAuthToken = uploadUrlResponse.data.authorizationToken;
 
     // Generate unique file name
     const fileName = `profile/${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
-    
+
     // Upload file to B2
-    const b2Response = await b2.uploadFile({
-      uploadUrl: uploadUrl,
-      uploadAuthToken: uploadAuthToken,
-      fileName: fileName,
+    await b2.uploadFile({
+      uploadUrl,
+      uploadAuthToken,
+      fileName,
       data: file.buffer,
       contentType: file.mimetype,
     });
 
-    // Construct public URL
-    const imageUrl = `https://f005.backblazeb2.com/file/${process.env.B2_BUCKET_NAME}/${fileName}`;
-    
+    // Construct public URL using the correct downloadUrl
+    const imageUrl = `${downloadUrl}/file/${process.env.B2_BUCKET_NAME}/${fileName}`;
+
     res.status(200).json({ imageUrl });
   } catch (err) {
     console.error('B2 Upload Error:', err);

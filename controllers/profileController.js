@@ -24,9 +24,17 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { bio, profilePic, coverImage, phone, website } = req.body;
+    let { bio, profilePic, coverImage, phone, website } = req.body;
+
+    // Normalize website to include protocol if provided
+    if (typeof website === 'string' && website.trim() !== '') {
+      website = website.startsWith('http://') || website.startsWith('https://')
+        ? website.trim()
+        : `https://${website.trim()}`;
+    }
 
     const update = { bio, profilePic, coverImage, phone, website };
+    // remove undefined keys to avoid overwriting unintentionally
     for (const key in update) {
       if (update[key] === undefined) delete update[key];
     }
@@ -38,6 +46,7 @@ exports.updateProfile = async (req, res) => {
 
     res.status(200).json({ user });
   } catch (err) {
+    console.error('Update profile error:', err);
     res.status(500).json({ errors: { server: 'Server error' } });
   }
 };

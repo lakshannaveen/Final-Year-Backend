@@ -6,6 +6,9 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   phone: { type: String },
   serviceType: { type: String, enum: ['finding', 'posting'], required: true },
+  bio: { type: String, default: "" },
+  profilePic: { type: String, default: "" },      
+  coverImage: { type: String, default: "" },    
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

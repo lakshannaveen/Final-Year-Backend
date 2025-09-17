@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
+const passport = require("passport");
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -13,11 +14,12 @@ const cookieOptions = {
   maxAge: 60 * 60 * 1000, // 1 hour
 };
 
+// Local Register
 exports.register = async (req, res) => {
   try {
     const { username, email, password, phone, serviceType } = req.body;
     let errors = {};
-    
+
     // Validation
     if (!username || username.length > 10) errors.username = "Invalid username";
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) errors.email = "Invalid email";
@@ -26,7 +28,6 @@ exports.register = async (req, res) => {
     if (serviceType === "posting") {
       if (!phone || !/^07\d{8}$/.test(phone)) errors.phone = "Invalid phone";
     }
-    
     if (Object.keys(errors).length) return res.status(400).json({ errors });
 
     // Check if user exists
@@ -70,11 +71,12 @@ exports.register = async (req, res) => {
   }
 };
 
+// Local Login
 exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
     let errors = {};
-    
+
     // Validation
     if (!username) errors.username = "Username is required";
     if (!password) errors.password = "Password is required";
@@ -124,11 +126,83 @@ exports.getCurrentUser = async (req, res) => {
 
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
-    
+
     if (!user) return res.status(200).json({ user: null });
-    
+
     res.status(200).json({ user: { username: user.username, email: user.email } });
   } catch (err) {
     res.status(200).json({ user: null });
   }
 };
+
+// Passport Google Strategy
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.API_URL
+        ? `${process.env.API_URL}/api/auth/google/callback`
+        : "http://localhost:5000/api/auth/google/callback",
+    },
+    async function (accessToken, refreshToken, profile, done) {
+      try {
+        let user = await User.findOne({ googleId: profile.id });
+
+        if (!user) {
+          // If email exists, link Google account
+          user = await User.findOne({ email: profile.emails[0].value });
+          if (user) {
+            user.googleId = profile.id;
+            await user.save();
+          } else {
+            user = new User({
+              username: profile.displayName.slice(0, 10),
+              email: profile.emails[0].value,
+              googleId: profile.id,
+              serviceType: "finding", // default, can change later
+            });
+            await user.save();
+          }
+        }
+        return done(null, user);
+      } catch (err) {
+        return done(err, null);
+      }
+    }
+  )
+);
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+passport.deserializeUser(async (id, done) => {
+  const user = await User.findById(id).select("-password");
+  done(null, user);
+});
+
+exports.googleAuth = passport.authenticate("google", { scope: ["profile", "email"] });
+
+// IMPORTANT: googleCallback must be an array of middleware
+exports.googleCallback = [
+  passport.authenticate("google", { failureRedirect: "/login", session: false }),
+  (req, res) => {
+    // Issue JWT
+    const user = req.user;
+    const token = jwt.sign(
+      { id: user._id, username: user.username, email: user.email },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+    res.cookie("jwtToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 60 * 60 * 1000,
+    });
+    // Redirect to frontend home page (adjust /home or / as needed)
+    res.redirect(`${process.env.CLIENT_URL || "http://localhost:3000"}/`);
+  },
+];

@@ -146,13 +146,14 @@ passport.use(
       callbackURL: process.env.API_URL
         ? `${process.env.API_URL}/api/auth/google/callback`
         : "http://localhost:5000/api/auth/google/callback",
+      passReqToCallback: true, // <<< IMPORTANT
     },
-    async function (accessToken, refreshToken, profile, done) {
+    async function (req, accessToken, refreshToken, profile, done) {
       try {
         let user = await User.findOne({ googleId: profile.id });
+        const serviceType = req.query.state || req.query.serviceType || "finding";
 
         if (!user) {
-          // If email exists, link Google account
           user = await User.findOne({ email: profile.emails[0].value });
           if (user) {
             user.googleId = profile.id;
@@ -162,7 +163,7 @@ passport.use(
               username: profile.displayName.slice(0, 10),
               email: profile.emails[0].value,
               googleId: profile.id,
-              serviceType: "finding", // default, can change later
+              serviceType,
             });
             await user.save();
           }
@@ -175,22 +176,16 @@ passport.use(
   )
 );
 
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-passport.deserializeUser(async (id, done) => {
-  const user = await User.findById(id).select("-password");
-  done(null, user);
-});
-
-exports.googleAuth = passport.authenticate("google", { scope: ["profile", "email"] });
-
-// IMPORTANT: googleCallback must be an array of middleware
+// Google callback
 exports.googleCallback = [
   passport.authenticate("google", { failureRedirect: "/login", session: false }),
-  (req, res) => {
-    // Issue JWT
+  async (req, res) => {
+    const serviceType = req.query.state || req.query.serviceType || "finding";
     const user = req.user;
+    if (user && user.serviceType !== serviceType) {
+      user.serviceType = serviceType;
+      await user.save();
+    }
     const token = jwt.sign(
       { id: user._id, username: user.username, email: user.email },
       JWT_SECRET,
@@ -202,7 +197,6 @@ exports.googleCallback = [
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 60 * 60 * 1000,
     });
-    // Redirect to frontend home page (adjust /home or / as needed)
     res.redirect(`${process.env.CLIENT_URL || "http://localhost:3000"}/`);
   },
 ];

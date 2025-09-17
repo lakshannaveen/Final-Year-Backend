@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema(
   {
-    username: { type: String, maxlength: 10, trim: true },
-    email: { type: String, lowercase: true, trim: true, required: true },
+    username: { type: String, maxlength: 10, trim: true, required: true, unique: true },
+    email: { type: String, lowercase: true, trim: true, required: true, unique: true },
     password: { type: String },
     googleId: { type: String, default: "" },
     phone: { type: String, trim: true },
@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Compound unique index: email + serviceType
-userSchema.index({ email: 1, serviceType: 1 }, { unique: true });
+// Remove compound index, single unique for email and username
+// userSchema.index({ email: 1, serviceType: 1 }, { unique: true });
 
 module.exports = mongoose.model('User', userSchema);

@@ -13,7 +13,7 @@ const cookieOptions = {
   maxAge: 60 * 60 * 1000,
 };
 
-// Local Register
+// Register
 exports.register = async (req, res) => {
   try {
     const { username, email, password, phone, serviceType } = req.body;
@@ -29,10 +29,17 @@ exports.register = async (req, res) => {
     }
     if (Object.keys(errors).length) return res.status(400).json({ errors });
 
-    // Check if username exists (email+serviceType is handled by MongoDB unique index)
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
+    // Check if username exists
+    const existingUserByUsername = await User.findOne({ username });
+    if (existingUserByUsername) {
       errors.username = "Username already exists";
+      return res.status(400).json({ errors });
+    }
+
+    // Check if email is already used
+    const existingUserByEmail = await User.findOne({ email });
+    if (existingUserByEmail) {
+      errors.email = "Email is already used for another account type";
       return res.status(400).json({ errors });
     }
 
@@ -52,7 +59,7 @@ exports.register = async (req, res) => {
 
     // Generate JWT
     const token = jwt.sign(
-      { id: user._id, username: user.username, email: user.email },
+      { id: user._id, username: user.username, email: user.email, serviceType: user.serviceType },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
@@ -61,14 +68,14 @@ exports.register = async (req, res) => {
 
     res.status(201).json({
       message: "Registered successfully",
-      user: { username: user.username, email: user.email }
+      user: { username: user.username, email: user.email, serviceType: user.serviceType }
     });
   } catch (err) {
-    // Duplicate key error (MongoDB code 11000)
-    if (err.code === 11000 && err.keyPattern && err.keyPattern.email && err.keyPattern.serviceType) {
+    // Duplicate key error
+    if (err.code === 11000 && err.keyPattern && err.keyPattern.email) {
       return res.status(400).json({
         errors: {
-          email: "An account with this email and account type already exists"
+          email: "An account with this email already exists"
         }
       });
     }
@@ -77,7 +84,7 @@ exports.register = async (req, res) => {
   }
 };
 
-// Local Login
+// Login
 exports.login = async (req, res) => {
   try {
     const { username, password, serviceType } = req.body;
@@ -91,12 +98,13 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ username });
     if (!user) return res.status(400).json({ errors: { username: "User not found" } });
 
+    // Block login if serviceType does not match
+    if (user.serviceType !== serviceType) {
+      return res.status(400).json({ errors: { serviceType: "This email/username is already used for another account type." } });
+    }
+
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(400).json({ errors: { password: "Incorrect password" } });
-
-    if (user.serviceType !== serviceType) {
-      return res.status(400).json({ errors: { serviceType: "Account type mismatch." } });
-    }
 
     const token = jwt.sign(
       { id: user._id, username: user.username, email: user.email, serviceType: user.serviceType },
@@ -116,6 +124,7 @@ exports.login = async (req, res) => {
   }
 };
 
+// Logout
 exports.logout = (req, res) => {
   res.clearCookie('jwtToken', {
     httpOnly: true,
@@ -125,6 +134,7 @@ exports.logout = (req, res) => {
   res.status(200).json({ message: 'Logged out successfully.' });
 };
 
+// Get current user
 exports.getCurrentUser = async (req, res) => {
   try {
     const token = req.cookies.jwtToken;
@@ -134,14 +144,13 @@ exports.getCurrentUser = async (req, res) => {
     const user = await User.findById(decoded.id).select('-password');
     if (!user) return res.status(200).json({ user: null });
 
-    res.status(200).json({ user: { username: user.username, email: user.email } });
+    res.status(200).json({ user: { username: user.username, email: user.email, serviceType: user.serviceType } });
   } catch (err) {
     res.status(200).json({ user: null });
   }
 };
 
-
-// Passport Google Strategy
+// Google OAuth
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
 passport.use(
@@ -152,20 +161,26 @@ passport.use(
       callbackURL: process.env.API_URL
         ? `${process.env.API_URL}/api/auth/google/callback`
         : "http://localhost:5000/api/auth/google/callback",
-      passReqToCallback: true, // <--- IMPORTANT!
+      passReqToCallback: true,
     },
     async function (req, accessToken, refreshToken, profile, done) {
       try {
-        // Get serviceType from state param
         const serviceType = req.query.state || req.query.serviceType || "finding";
+        // Block Google login/register if email used for another type
+        const existingUserByEmail = await User.findOne({ email: profile.emails[0].value });
+        if (existingUserByEmail && existingUserByEmail.serviceType !== serviceType) {
+          return done(
+            { message: "This email is already used for another account type." },
+            null
+          );
+        }
+
         let user = await User.findOne({ googleId: profile.id });
 
         if (!user) {
-          // If email exists, link Google account
-          user = await User.findOne({ email: profile.emails[0].value });
-          if (user) {
+          if (existingUserByEmail) {
+            user = existingUserByEmail;
             user.googleId = profile.id;
-            // Update serviceType if user is newly registering
             user.serviceType = serviceType;
             await user.save();
           } else {
@@ -178,7 +193,6 @@ passport.use(
             await user.save();
           }
         } else {
-          // If already exists, update serviceType only if missing
           if (!user.serviceType) {
             user.serviceType = serviceType;
             await user.save();
@@ -202,19 +216,28 @@ passport.deserializeUser(async (id, done) => {
 
 exports.googleAuth = passport.authenticate("google", { scope: ["profile", "email"] });
 
-// Callback: update serviceType according to state param
 exports.googleCallback = [
-  passport.authenticate("google", { failureRedirect: "/login", session: false }),
+  function (req, res, next) {
+    passport.authenticate("google", function (err, user) {
+      if (err && err.message) {
+        // Redirect to client with error
+        return res.redirect(
+          `${process.env.CLIENT_URL || "http://localhost:3000"}/?oauth_error=${encodeURIComponent(err.message)}`
+        );
+      }
+      req.user = user;
+      next();
+    })(req, res, next);
+  },
   async (req, res) => {
     const serviceType = req.query.state || req.query.serviceType || "finding";
     const user = req.user;
-    // Update serviceType if needed
     if (user && user.serviceType !== serviceType) {
       user.serviceType = serviceType;
       await user.save();
     }
     const token = jwt.sign(
-      { id: user._id, username: user.username, email: user.email },
+      { id: user._id, username: user.username, email: user.email, serviceType: user.serviceType },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );

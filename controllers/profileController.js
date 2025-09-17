@@ -103,6 +103,7 @@ exports.uploadImage = async (req, res) => {
     res.status(500).json({ errors: { server: 'Upload failed', details: err.message } });
   }
 };
+
 // Get Public Profile by ID or username
 exports.getPublicProfile = async (req, res) => {
   try {
@@ -110,10 +111,14 @@ exports.getPublicProfile = async (req, res) => {
     let user;
     if (/^[0-9a-fA-F]{24}$/.test(idOrUsername)) {
       // Looks like a MongoDB ObjectId
-      user = await User.findById(idOrUsername).select('-password -email -phone -website');
+      user = await User.findById(idOrUsername).select(
+        '-password -email'
+      );
     } else {
       // Otherwise treat as username
-      user = await User.findOne({ username: idOrUsername }).select('-password -email -phone -website');
+      user = await User.findOne({ username: idOrUsername }).select(
+        '-password -email'
+      );
     }
     if (!user) return res.status(404).json({ errors: { user: 'User not found' } });
     res.status(200).json({ user });

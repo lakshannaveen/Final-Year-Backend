@@ -1,4 +1,4 @@
-const Feed = require('../models/Feed');
+const Feed = require('../models/Feed'); // Make sure the filename and registration is Feed.js
 const B2 = require('backblaze-b2');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -51,12 +51,15 @@ exports.createFeed = async (req, res) => {
   }
 };
 
-// Get all posts
-exports.getAllFeeds = async (req, res) => {
+// Get all feeds with user's username and profilePic
+exports.getAllFeedsWithUser = async (req, res) => {
   try {
-    const feeds = await Feed.find().populate("user", "username serviceType profilePic");
+    const feeds = await Feed.find()
+      .sort({ createdAt: -1 })
+      .populate("user", "username profilePic");
     res.status(200).json({ feeds });
   } catch (err) {
+    console.error("Get all feeds error:", err);
     res.status(500).json({ errors: { server: "Failed to fetch posts" } });
   }
 };

@@ -20,16 +20,33 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// Update Profile
+// Update Profile, including username
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
 
     // Read current serviceType to enforce rules
-    const current = await User.findById(userId).select('serviceType');
+    const current = await User.findById(userId).select('serviceType username');
     if (!current) return res.status(404).json({ errors: { user: 'User not found' } });
 
-    let { bio, profilePic, coverImage, phone, website } = req.body;
+    let { username, bio, profilePic, coverImage, phone, website } = req.body;
+
+    // Validate username if present
+    if (typeof username === 'string') {
+      username = username.trim();
+      if (username.length < 2 || username.length > 10) {
+        return res.status(400).json({ errors: { username: 'Username must be 2-10 characters.' } });
+      }
+      // Check for uniqueness if changed
+      if (username !== current.username) {
+        const exists = await User.findOne({ username });
+        if (exists) {
+          return res.status(400).json({ errors: { username: 'Username already taken.' } });
+        }
+      }
+    } else {
+      username = undefined;
+    }
 
     // If the user is not a posting account, ignore phone, website, and cover updates
     if (current.serviceType !== 'posting') {
@@ -46,7 +63,7 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    const update = { bio, profilePic, coverImage, phone, website };
+    const update = { username, bio, profilePic, coverImage, phone, website };
     // remove undefined keys to avoid overwriting unintentionally
     for (const key in update) {
       if (update[key] === undefined) delete update[key];

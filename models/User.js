@@ -3,13 +3,10 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema(
   {
     username: { type: String, maxlength: 10, trim: true },
-    email: { type: String, unique: true, lowercase: true, trim: true },
+    email: { type: String, lowercase: true, trim: true, required: true },
     password: { type: String },
-
-    googleId: { type: String, default: "" }, // <--- Add this line
-
+    googleId: { type: String, default: "" },
     phone: { type: String, trim: true },
-
     website: {
       type: String,
       default: "",
@@ -22,9 +19,7 @@ const userSchema = new mongoose.Schema(
         message: 'Website must start with http:// or https://',
       },
     },
-
     serviceType: { type: String, enum: ['finding', 'posting'], required: true },
-
     bio: { type: String, default: "", trim: true },
     profilePic: { type: String, default: "" },
     coverImage: { type: String, default: "" },
@@ -32,6 +27,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.index({ email: 1 }, { unique: true });
+// Compound unique index: email + serviceType
+userSchema.index({ email: 1, serviceType: 1 }, { unique: true });
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const passport = require("passport"); // <-- IMPORT PASSPORT!
+const passport = require("passport");
 const {
   register,
   login,

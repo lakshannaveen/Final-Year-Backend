@@ -6,12 +6,11 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 
-// Cookie options
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  maxAge: 60 * 60 * 1000, // 1 hour
+  maxAge: 60 * 60 * 1000,
 };
 
 // Local Register
@@ -30,11 +29,10 @@ exports.register = async (req, res) => {
     }
     if (Object.keys(errors).length) return res.status(400).json({ errors });
 
-    // Check if user exists
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    // Check if username exists (email+serviceType is handled by MongoDB unique index)
+    const existingUser = await User.findOne({ username });
     if (existingUser) {
-      if (existingUser.email === email) errors.email = "Email already exists";
-      if (existingUser.username === username) errors.username = "Username already exists";
+      errors.username = "Username already exists";
       return res.status(400).json({ errors });
     }
 
@@ -49,6 +47,7 @@ exports.register = async (req, res) => {
       phone: serviceType === "posting" ? phone : undefined,
       serviceType,
     });
+
     await user.save();
 
     // Generate JWT
@@ -58,7 +57,6 @@ exports.register = async (req, res) => {
       { expiresIn: JWT_EXPIRES_IN }
     );
 
-    // Set JWT in cookie
     res.cookie('jwtToken', token, cookieOptions);
 
     res.status(201).json({
@@ -66,6 +64,14 @@ exports.register = async (req, res) => {
       user: { username: user.username, email: user.email }
     });
   } catch (err) {
+    // Duplicate key error (MongoDB code 11000)
+    if (err.code === 11000 && err.keyPattern && err.keyPattern.email && err.keyPattern.serviceType) {
+      return res.status(400).json({
+        errors: {
+          email: "An account with this email and account type already exists"
+        }
+      });
+    }
     console.error("Registration error:", err);
     res.status(500).json({ errors: { server: "Server error" } });
   }
@@ -74,35 +80,35 @@ exports.register = async (req, res) => {
 // Local Login
 exports.login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, serviceType } = req.body;
     let errors = {};
 
-    // Validation
     if (!username) errors.username = "Username is required";
     if (!password) errors.password = "Password is required";
+    if (!serviceType || !["finding","posting"].includes(serviceType)) errors.serviceType = "Service type required";
     if (Object.keys(errors).length) return res.status(400).json({ errors });
 
-    // Find user
     const user = await User.findOne({ username });
     if (!user) return res.status(400).json({ errors: { username: "User not found" } });
 
-    // Check password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(400).json({ errors: { password: "Incorrect password" } });
 
-    // Generate JWT
+    if (user.serviceType !== serviceType) {
+      return res.status(400).json({ errors: { serviceType: "Account type mismatch." } });
+    }
+
     const token = jwt.sign(
-      { id: user._id, username: user.username, email: user.email },
+      { id: user._id, username: user.username, email: user.email, serviceType: user.serviceType },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
 
-    // Set JWT in cookie
     res.cookie('jwtToken', token, cookieOptions);
 
     res.status(200).json({
       message: "Login successful",
-      user: { username: user.username, email: user.email }
+      user: { username: user.username, email: user.email, serviceType: user.serviceType }
     });
   } catch (err) {
     console.error("Login error:", err);
@@ -126,7 +132,6 @@ exports.getCurrentUser = async (req, res) => {
 
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
-
     if (!user) return res.status(200).json({ user: null });
 
     res.status(200).json({ user: { username: user.username, email: user.email } });
@@ -134,6 +139,7 @@ exports.getCurrentUser = async (req, res) => {
     res.status(200).json({ user: null });
   }
 };
+
 
 // Passport Google Strategy
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
@@ -146,17 +152,21 @@ passport.use(
       callbackURL: process.env.API_URL
         ? `${process.env.API_URL}/api/auth/google/callback`
         : "http://localhost:5000/api/auth/google/callback",
-      passReqToCallback: true, // <<< IMPORTANT
+      passReqToCallback: true, // <--- IMPORTANT!
     },
     async function (req, accessToken, refreshToken, profile, done) {
       try {
-        let user = await User.findOne({ googleId: profile.id });
+        // Get serviceType from state param
         const serviceType = req.query.state || req.query.serviceType || "finding";
+        let user = await User.findOne({ googleId: profile.id });
 
         if (!user) {
+          // If email exists, link Google account
           user = await User.findOne({ email: profile.emails[0].value });
           if (user) {
             user.googleId = profile.id;
+            // Update serviceType if user is newly registering
+            user.serviceType = serviceType;
             await user.save();
           } else {
             user = new User({
@@ -165,6 +175,12 @@ passport.use(
               googleId: profile.id,
               serviceType,
             });
+            await user.save();
+          }
+        } else {
+          // If already exists, update serviceType only if missing
+          if (!user.serviceType) {
+            user.serviceType = serviceType;
             await user.save();
           }
         }
@@ -176,12 +192,23 @@ passport.use(
   )
 );
 
-// Google callback
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+passport.deserializeUser(async (id, done) => {
+  const user = await User.findById(id).select("-password");
+  done(null, user);
+});
+
+exports.googleAuth = passport.authenticate("google", { scope: ["profile", "email"] });
+
+// Callback: update serviceType according to state param
 exports.googleCallback = [
   passport.authenticate("google", { failureRedirect: "/login", session: false }),
   async (req, res) => {
     const serviceType = req.query.state || req.query.serviceType || "finding";
     const user = req.user;
+    // Update serviceType if needed
     if (user && user.serviceType !== serviceType) {
       user.serviceType = serviceType;
       await user.save();

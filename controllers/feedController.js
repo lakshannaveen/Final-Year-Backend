@@ -115,3 +115,15 @@ exports.uploadFeedMedia = async (req, res) => {
     res.status(500).json({ errors: { server: 'Upload failed', details: err.message } });
   }
 };
+exports.getMyFeeds = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const feeds = await Feed.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .populate("user", "username profilePic");
+    res.status(200).json({ feeds });
+  } catch (err) {
+    console.error("Get my feeds error:", err);
+    res.status(500).json({ errors: { server: "Failed to fetch your posts" } });
+  }
+};

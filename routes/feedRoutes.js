@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createFeed, getFeedById, uploadFeedMedia, getAllFeedsWithUser } = require('../controllers/feedController');
+const { createFeed, getFeedById, uploadFeedMedia, getAllFeedsWithUser, getMyFeeds } = require('../controllers/feedController');
 const { requireAuth } = require('../middleware/auth');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -10,6 +10,9 @@ router.post('/', requireAuth, createFeed);
 
 // Get all posts with user info
 router.get('/all', getAllFeedsWithUser);
+
+// Get logged-in user's own posts
+router.get('/my', requireAuth, getMyFeeds);
 
 // Get one post by ID
 router.get('/:id', getFeedById);

@@ -1,6 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { createFeed, getFeedById, uploadFeedMedia, getAllFeedsWithUser, getMyFeeds } = require('../controllers/feedController');
+const { 
+  createFeed, 
+  getFeedById, 
+  uploadFeedMedia, 
+  getAllFeedsWithUser, 
+  getMyFeeds,
+  deleteFeed,
+  updateFeed
+} = require('../controllers/feedController');
 const { requireAuth } = require('../middleware/auth');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -19,5 +27,11 @@ router.get('/:id', getFeedById);
 
 // Upload photo/video for feed post
 router.post('/upload', requireAuth, upload.single('file'), uploadFeedMedia);
+
+// Delete a feed post (only owner)
+router.delete('/:id', requireAuth, deleteFeed);
+
+// Edit/update a feed post (only owner)
+router.put('/:id', requireAuth, updateFeed);
 
 module.exports = router;

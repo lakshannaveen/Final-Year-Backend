@@ -120,7 +120,6 @@ exports.getMyFeeds = async (req, res) => {
   }
 };
 
-// Delete feed post
 exports.deleteFeed = async (req, res) => {
   try {
     const feedId = req.params.id;
@@ -140,7 +139,6 @@ exports.deleteFeed = async (req, res) => {
   }
 };
 
-// Edit/update feed post
 exports.updateFeed = async (req, res) => {
   try {
     const feedId = req.params.id;
@@ -153,7 +151,6 @@ exports.updateFeed = async (req, res) => {
       return res.status(403).json({ errors: { server: "Unauthorized" } });
     }
 
-    // Only update editable fields
     const {
       title,
       location,

@@ -92,7 +92,7 @@ exports.login = async (req, res) => {
 
     if (!username) errors.username = "Username is required";
     if (!password) errors.password = "Password is required";
-    if (!serviceType || !["finding","posting"].includes(serviceType)) errors.serviceType = "Service type required";
+    if (!serviceType || !["serviceSeeker","posting"].includes(serviceType)) errors.serviceType = "Service type required";
     if (Object.keys(errors).length) return res.status(400).json({ errors });
 
     const user = await User.findOne({ username });
@@ -165,7 +165,7 @@ passport.use(
     },
     async function (req, accessToken, refreshToken, profile, done) {
       try {
-        const serviceType = req.query.state || req.query.serviceType || "finding";
+        const serviceType = req.query.state || req.query.serviceType || "serviceSeeker";
         // Block Google login/register if email used for another type
         const existingUserByEmail = await User.findOne({ email: profile.emails[0].value });
         if (existingUserByEmail && existingUserByEmail.serviceType !== serviceType) {
@@ -230,7 +230,7 @@ exports.googleCallback = [
     })(req, res, next);
   },
   async (req, res) => {
-    const serviceType = req.query.state || req.query.serviceType || "finding";
+    const serviceType = req.query.state || req.query.serviceType || "serviceSeeker";
     const user = req.user;
     if (user && user.serviceType !== serviceType) {
       user.serviceType = serviceType;

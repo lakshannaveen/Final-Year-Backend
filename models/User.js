@@ -19,15 +19,12 @@ const userSchema = new mongoose.Schema(
         message: 'Website must start with http:// or https://',
       },
     },
-    serviceType: { type: String, enum: ['finding', 'posting'], required: true },
+    serviceType: { type: String, enum: ['serviceSeeker', 'posting'], required: true },
     bio: { type: String, default: "", trim: true },
     profilePic: { type: String, default: "" },
     coverImage: { type: String, default: "" },
   },
   { timestamps: true }
 );
-
-// Remove compound index, single unique for email and username
-// userSchema.index({ email: 1, serviceType: 1 }, { unique: true });
 
 module.exports = mongoose.model('User', userSchema);

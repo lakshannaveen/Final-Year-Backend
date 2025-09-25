@@ -50,14 +50,30 @@ exports.createFeed = async (req, res) => {
   }
 };
 
-exports.getAllFeedsWithUser = async (req, res) => {
+// PAGINATED FEEDS ENDPOINT for infinite scrolling
+exports.getFeedsPaginated = async (req, res) => {
   try {
-    const feeds = await Feed.find()
-      .sort({ createdAt: -1 })
-      .populate("user", "username profilePic");
-    res.status(200).json({ feeds });
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
+
+    const [feeds, total] = await Promise.all([
+      Feed.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("user", "username profilePic"),
+      Feed.countDocuments(),
+    ]);
+
+    res.status(200).json({
+      feeds,
+      page,
+      totalPages: Math.ceil(total / limit),
+      total,
+    });
   } catch (err) {
-    console.error("Get all feeds error:", err);
+    console.error("Get paginated feeds error:", err);
     res.status(500).json({ errors: { server: "Failed to fetch posts" } });
   }
 };

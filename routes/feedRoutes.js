@@ -4,7 +4,7 @@ const {
   createFeed, 
   getFeedById, 
   uploadFeedMedia, 
-  getAllFeedsWithUser, 
+  getFeedsPaginated,
   getMyFeeds,
   deleteFeed,
   updateFeed
@@ -16,8 +16,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Create a post
 router.post('/', requireAuth, createFeed);
 
-// Get all posts with user info
-router.get('/all', getAllFeedsWithUser);
+// Infinite scroll paginated posts with user info
+router.get('/paginated', getFeedsPaginated);
 
 // Get logged-in user's own posts
 router.get('/my', requireAuth, getMyFeeds);

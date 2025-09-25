@@ -5,7 +5,7 @@ const {
   getFeedById, 
   uploadFeedMedia, 
   getFeedsPaginated,
-  getMyFeeds,
+  getMyFeedsPaginated,
   deleteFeed,
   updateFeed
 } = require('../controllers/feedController');
@@ -19,8 +19,10 @@ router.post('/', requireAuth, createFeed);
 // Infinite scroll paginated posts with user info
 router.get('/paginated', getFeedsPaginated);
 
-// Get logged-in user's own posts
-router.get('/my', requireAuth, getMyFeeds);
+
+
+// Get logged-in user's own posts (paginated, infinite scroll)
+router.get('/my-paginated', requireAuth, getMyFeedsPaginated);
 
 // Get one post by ID
 router.get('/:id', getFeedById);

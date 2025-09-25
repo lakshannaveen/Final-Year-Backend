@@ -123,18 +123,34 @@ exports.uploadFeedMedia = async (req, res) => {
   }
 };
 
-exports.getMyFeeds = async (req, res) => {
+exports.getMyFeedsPaginated = async (req, res) => {
   try {
     const userId = req.user.id;
-    const feeds = await Feed.find({ user: userId })
-      .sort({ createdAt: -1 })
-      .populate("user", "username profilePic");
-    res.status(200).json({ feeds });
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
+
+    const [feeds, total] = await Promise.all([
+      Feed.find({ user: userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("user", "username profilePic"),
+      Feed.countDocuments({ user: userId }),
+    ]);
+
+    res.status(200).json({
+      feeds,
+      page,
+      totalPages: Math.ceil(total / limit),
+      total,
+    });
   } catch (err) {
-    console.error("Get my feeds error:", err);
+    console.error("Get my paginated feeds error:", err);
     res.status(500).json({ errors: { server: "Failed to fetch your posts" } });
   }
 };
+
 
 exports.deleteFeed = async (req, res) => {
   try {

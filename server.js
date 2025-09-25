@@ -16,7 +16,6 @@ const io = require("socket.io")(server, {
   },
 });
 
-// CORS and body parsing
 app.use(cors({
   origin: process.env.CLIENT_URL || "http://localhost:3000",
   credentials: true,
@@ -24,7 +23,6 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// MongoDB
 mongoose.connect(process.env.MONGO_URI , {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -32,22 +30,20 @@ mongoose.connect(process.env.MONGO_URI , {
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// Socket.IO user management
+// Socket.IO user-room management
 const onlineUsers = {}; // userId: socket.id
 
 io.on("connection", (socket) => {
   socket.on("join", (userId) => {
     onlineUsers[userId] = socket.id;
+    socket.join(userId);
   });
 
-  socket.on("sendMessage", (data) => {
-    const { recipientId, message } = data;
-    const recipientSocketId = onlineUsers[recipientId];
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("receiveMessage", message);
-    }
-    // Optionally: echo to sender for confirmation
-    socket.emit("receiveMessage", message);
+  socket.on("sendMessage", ({ recipientId, message }) => {
+    // Emit to recipient only
+    io.to(recipientId).emit("receiveMessage", { ...message, _fromSocket: true });
+    // Echo to sender as "me"
+    io.to(message.senderId).emit("receiveMessage", { ...message, sender: "me", _fromSocket: true });
   });
 
   socket.on("disconnect", () => {

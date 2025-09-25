@@ -30,17 +30,18 @@ exports.sendMessage = (io) => async (req, res) => {
     const formatted = {
       _id: message._id,
       sender: senderId === message.sender._id.toString() ? "me" : message.sender.username,
-      senderId: message.sender._id,
+      senderId: message.sender._id.toString(),
       senderProfilePic: message.sender.profilePic,
-      recipientId: message.recipient._id,
+      recipientId: message.recipient._id.toString(),
       recipientUsername: message.recipient.username,
       postId: message.postId,
       text: message.text,
       createdAt: message.createdAt,
     };
 
-    // Real-time delivery
-    io.emit("receiveMessage", formatted);
+    // Real-time delivery to both users
+    io.to(recipientId).emit("receiveMessage", { ...formatted, sender: message.sender.username });
+    io.to(senderId).emit("receiveMessage", { ...formatted, sender: "me" });
 
     res.status(201).json({ message: formatted });
   } catch (err) {
@@ -71,9 +72,9 @@ exports.getMessages = async (req, res) => {
     const formatted = messages.map((msg) => ({
       _id: msg._id,
       sender: msg.sender._id.toString() === userId ? "me" : msg.sender.username,
-      senderId: msg.sender._id,
+      senderId: msg.sender._id.toString(),
       senderProfilePic: msg.sender.profilePic,
-      recipientId: msg.recipient._id,
+      recipientId: msg.recipient._id.toString(),
       recipientUsername: msg.recipient.username,
       postId: msg.postId,
       text: msg.text,

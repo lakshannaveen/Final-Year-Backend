@@ -1,27 +1,19 @@
 const Message = require("../models/Message");
-const User = require("../models/User");
 const Feed = require("../models/Feed");
 
-// Send a message (now supports postId)
-exports.sendMessage = async (req, res) => {
+exports.sendMessage = (io) => async (req, res) => {
   try {
     const { recipientId } = req.params;
     const { text, postId } = req.body;
     const senderId = req.user.id;
 
-    console.log("DEBUG sendMessage:", { senderId, recipientId, postId, text });
-
     if (!text || !recipientId) {
       return res.status(400).json({ error: "Text and recipient are required." });
     }
 
-    // Optionally you can check if postId exists in Feed collection
-    let post = null;
     if (postId) {
-      post = await Feed.findById(postId);
-      if (!post) {
-        return res.status(400).json({ error: "Post not found." });
-      }
+      const post = await Feed.findById(postId);
+      if (!post) return res.status(400).json({ error: "Post not found." });
     }
 
     const message = await Message.create({
@@ -31,19 +23,36 @@ exports.sendMessage = async (req, res) => {
       text,
     });
 
-    res.status(201).json({ message });
+    await message.populate("sender", "username profilePic");
+    await message.populate("recipient", "username profilePic");
+
+    // Format for frontend
+    const formatted = {
+      _id: message._id,
+      sender: senderId === message.sender._id.toString() ? "me" : message.sender.username,
+      senderId: message.sender._id,
+      senderProfilePic: message.sender.profilePic,
+      recipientId: message.recipient._id,
+      recipientUsername: message.recipient.username,
+      postId: message.postId,
+      text: message.text,
+      createdAt: message.createdAt,
+    };
+
+    // Real-time delivery
+    io.emit("receiveMessage", formatted);
+
+    res.status(201).json({ message: formatted });
   } catch (err) {
-    console.error("sendMessage ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-// Fetch all messages between two users (optionally filtered by postId)
 exports.getMessages = async (req, res) => {
   try {
     const userId = req.user.id;
     const { recipientId } = req.params;
-    const { postId } = req.query; // pass postId as query param
+    const { postId } = req.query;
 
     let query = {
       $or: [
@@ -71,11 +80,8 @@ exports.getMessages = async (req, res) => {
       createdAt: msg.createdAt,
     }));
 
-    console.log("DEBUG getMessages:", formatted);
-
     res.json({ messages: formatted });
   } catch (err) {
-    console.error("getMessages ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 };

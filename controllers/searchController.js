@@ -4,13 +4,49 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const fetchAI = global.fetch;
-const FEED_LIMIT = 30;
+const fetch = global.fetch || require('node-fetch'); // For Node < 18
+const SERVICE_TYPES = [
+  "plumber", "electrician", "carpenter", "cleaner", "repair",
+  "gardener", "driver", "mechanic", "chef", "babysitter"
+];
+const LOCATIONS = [
+  "galle", "colombo", "kandy", "negombo", "matara", "jaffna", "kurunegala",
+  "anuradhapura", "ratnapura", "batticaloa", "trincomalee", "badulla"
+];
 
-// Always returns feeds[] with user._id, username, profilePic, location, serviceType
-async function simpleTextSearch(query, limit = 15) {
-  try {
-    const feeds = await Feed.find({
+function parseSearchQuery(query) {
+  const q = query.toLowerCase();
+  let serviceType = null, location = null;
+  for (const service of SERVICE_TYPES) {
+    if (q.includes(service)) {
+      serviceType = service;
+      break;
+    }
+  }
+  for (const loc of LOCATIONS) {
+    if (q.includes(loc)) {
+      location = loc;
+      break;
+    }
+  }
+  return { serviceType, location };
+}
+
+async function smartFeedSearch(query, limit = 15) {
+  const { serviceType, location } = parseSearchQuery(query);
+  const mongoQuery = {};
+  if (serviceType) {
+    mongoQuery["$or"] = [
+      { "title": new RegExp(serviceType, "i") },
+      { "description": new RegExp(serviceType, "i") },
+      { "user.serviceType": new RegExp(serviceType, "i") }
+    ];
+  }
+  if (location) {
+    mongoQuery["location"] = new RegExp(location, "i");
+  }
+  if (!serviceType && !location) {
+    return await Feed.find({
       $or: [
         { title: { $regex: query, $options: 'i' } },
         { description: { $regex: query, $options: 'i' } },
@@ -20,8 +56,42 @@ async function simpleTextSearch(query, limit = 15) {
     .sort({ createdAt: -1 })
     .limit(limit)
     .populate("user", "username profilePic location serviceType");
-    // Ensure user is always an object
-    return feeds.map(feed => ({
+  }
+  return await Feed.find(mongoQuery)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate("user", "username profilePic location serviceType");
+}
+
+async function deepseekAISearch(query, limit = 15) {
+  if (!DEEPSEEK_API_KEY) return [];
+  // Prepare all feeds for embedding search
+  const feeds = await Feed.find({}).limit(200).populate("user", "username profilePic location serviceType");
+  const documents = feeds.map(feed => ({
+    id: feed._id.toString(),
+    text: `${feed.title} ${feed.description} ${feed.location} ${feed.user?.serviceType || ""} ${feed.user?.username || ""}`,
+  }));
+  // Call DeepSeek API for semantic search
+  try {
+    const deepseekRes = await fetch("https://api.deepseek.com/v1/search", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${DEEPSEEK_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query,
+        documents,
+        limit,
+      }),
+    });
+    const deepseekData = await deepseekRes.json();
+    if (!deepseekRes.ok || !deepseekData.results) return [];
+    // Match feed IDs
+    const resultIds = deepseekData.results.map(r => r.id);
+    const matchedFeeds = feeds.filter(feed => resultIds.includes(feed._id.toString()));
+    // Always shape user fields
+    return matchedFeeds.map(feed => ({
       ...feed._doc,
       user: feed.user ? {
         _id: feed.user._id,
@@ -31,7 +101,7 @@ async function simpleTextSearch(query, limit = 15) {
         serviceType: feed.user.serviceType || "",
       } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
     }));
-  } catch (error) {
+  } catch (err) {
     return [];
   }
 }
@@ -42,16 +112,42 @@ exports.searchFeeds = async (req, res) => {
     if (!query) {
       return res.status(200).json({ feeds: [], message: "No search query provided", searchType: "none" });
     }
-    // Always return feeds, never undefined users
-    let simpleResults = await simpleTextSearch(query, 20);
-    if (simpleResults.length >= 5) {
-      return res.status(200).json({ feeds: simpleResults.slice(0, 15), searchType: "text", message: `Found ${simpleResults.length} matches` });
+    // 1. Smart keyword search
+    let feeds = await smartFeedSearch(query, 20);
+    feeds = feeds.map(feed => ({
+      ...feed._doc,
+      user: feed.user ? {
+        _id: feed.user._id,
+        username: feed.user.username,
+        profilePic: feed.user.profilePic || "",
+        location: feed.user.location || "",
+        serviceType: feed.user.serviceType || "",
+      } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
+    }));
+
+    if (feeds.length >= 5) {
+      return res.status(200).json({
+        feeds: feeds.slice(0, 15),
+        searchType: "text",
+        message: `Found ${feeds.length} matches`
+      });
     }
-    // --- AI logic omitted for clarity and stability ---
+
+    // 2. Fallback to DeepSeek semantic search
+    const aiFeeds = await deepseekAISearch(query, 15);
+    if (aiFeeds.length > 0) {
+      return res.status(200).json({
+        feeds: aiFeeds,
+        searchType: "ai",
+        message: `Found ${aiFeeds.length} results (AI search)`
+      });
+    }
+
+    // 3. Fallback to basic results
     return res.status(200).json({
-      feeds: simpleResults,
+      feeds,
       searchType: "text-fallback",
-      message: `Found ${simpleResults.length} results (basic search)`
+      message: `Found ${feeds.length} results (basic search)`
     });
   } catch (err) {
     res.status(200).json({ feeds: [], searchType: "error", error: "Search service temporarily unavailable" });
@@ -87,5 +183,5 @@ exports.getSearchSuggestions = async (req, res) => {
 };
 
 exports.checkAIService = async (req, res) => {
-  res.status(200).json({ available: true, message: "AI service check (mock)" });
+  res.status(200).json({ available: !!DEEPSEEK_API_KEY, message: "AI service check" });
 };

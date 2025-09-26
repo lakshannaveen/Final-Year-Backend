@@ -208,3 +208,41 @@ exports.updateFeed = async (req, res) => {
     res.status(500).json({ errors: { server: "Failed to update post" } });
   }
 };
+exports.getPublicFeedsPaginated = async (req, res) => {
+  try {
+    const { idOrUsername } = req.params;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
+
+    // Find user by id or username
+    let userQuery;
+    if (/^[0-9a-fA-F]{24}$/.test(idOrUsername)) {
+      userQuery = { _id: idOrUsername };
+    } else {
+      userQuery = { username: idOrUsername };
+    }
+    const user = await require('../models/User').findOne(userQuery);
+    if (!user) return res.status(404).json({ errors: { user: "User not found" } });
+
+    const [feeds, total] = await Promise.all([
+      Feed.find({ user: user._id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("user", "username profilePic"),
+      Feed.countDocuments({ user: user._id }),
+    ]);
+
+    res.status(200).json({
+      feeds,
+      page,
+      totalPages: Math.ceil(total / limit),
+      total,
+      user: { _id: user._id, username: user.username, profilePic: user.profilePic }
+    });
+  } catch (err) {
+    console.error("Get public paginated feeds error:", err);
+    res.status(500).json({ errors: { server: "Failed to fetch user's posts" } });
+  }
+};

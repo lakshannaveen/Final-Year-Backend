@@ -7,7 +7,8 @@ const {
   getFeedsPaginated,
   getMyFeedsPaginated,
   deleteFeed,
-  updateFeed
+  updateFeed,
+  getPublicFeedsPaginated
 } = require('../controllers/feedController');
 const { requireAuth } = require('../middleware/auth');
 const multer = require('multer');
@@ -35,5 +36,8 @@ router.delete('/:id', requireAuth, deleteFeed);
 
 // Edit/update a feed post (only owner)
 router.put('/:id', requireAuth, updateFeed);
+
+router.get('/public-paginated/:idOrUsername', getPublicFeedsPaginated);
+
 
 module.exports = router;

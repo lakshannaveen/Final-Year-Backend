@@ -1,8 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { searchFeeds } = require('../controllers/searchController');
-const { requireAuth } = require('../middleware/auth');
+const {
+  searchFeeds,
+  getSearchSuggestions,
+  checkAIService
+} = require('../controllers/searchController');
 
-router.get('/feed/search', requireAuth, searchFeeds);
+router.get('/feeds/search', searchFeeds);
+router.get('/feeds/suggestions', getSearchSuggestions);
+router.get('/feeds/ai-status', checkAIService);
 
 module.exports = router;

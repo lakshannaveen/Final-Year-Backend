@@ -32,7 +32,7 @@ function parseSearchQuery(query) {
   return { serviceType, location };
 }
 
-async function smartFeedSearch(query, limit = 15) {
+async function smartFeedSearch(query, limit = 20) {
   const { serviceType, location } = parseSearchQuery(query);
   const mongoQuery = {};
   if (serviceType) {
@@ -53,9 +53,9 @@ async function smartFeedSearch(query, limit = 15) {
         { location: { $regex: query, $options: 'i' } }
       ]
     })
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .populate("user", "username profilePic location serviceType");
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate("user", "username profilePic location serviceType");
   }
   return await Feed.find(mongoQuery)
     .sort({ createdAt: -1 })
@@ -65,13 +65,11 @@ async function smartFeedSearch(query, limit = 15) {
 
 async function deepseekAISearch(query, limit = 15) {
   if (!DEEPSEEK_API_KEY) return [];
-  // Prepare all feeds for embedding search
   const feeds = await Feed.find({}).limit(200).populate("user", "username profilePic location serviceType");
   const documents = feeds.map(feed => ({
     id: feed._id.toString(),
     text: `${feed.title} ${feed.description} ${feed.location} ${feed.user?.serviceType || ""} ${feed.user?.username || ""}`,
   }));
-  // Call DeepSeek API for semantic search
   try {
     const deepseekRes = await fetch("https://api.deepseek.com/v1/search", {
       method: "POST",
@@ -87,10 +85,8 @@ async function deepseekAISearch(query, limit = 15) {
     });
     const deepseekData = await deepseekRes.json();
     if (!deepseekRes.ok || !deepseekData.results) return [];
-    // Match feed IDs
     const resultIds = deepseekData.results.map(r => r.id);
     const matchedFeeds = feeds.filter(feed => resultIds.includes(feed._id.toString()));
-    // Always shape user fields
     return matchedFeeds.map(feed => ({
       ...feed._doc,
       user: feed.user ? {
@@ -106,12 +102,43 @@ async function deepseekAISearch(query, limit = 15) {
   }
 }
 
+async function getNearestLocationFeeds(user, limit = 10) {
+  if (!user || !user.location) return [];
+  return await Feed.find({ location: new RegExp(user.location, "i") })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate("user", "username profilePic location serviceType");
+}
+
 exports.searchFeeds = async (req, res) => {
   try {
     const query = req.query.query?.trim();
-    if (!query) {
-      return res.status(200).json({ feeds: [], message: "No search query provided", searchType: "none" });
+    let userFeeds = [];
+    if (req.user && req.user.location) {
+      userFeeds = await getNearestLocationFeeds(req.user, 10);
+      userFeeds = userFeeds.map(feed => ({
+        ...feed._doc,
+        user: feed.user ? {
+          _id: feed.user._id,
+          username: feed.user.username,
+          profilePic: feed.user.profilePic || "",
+          location: feed.user.location || "",
+          serviceType: feed.user.serviceType || "",
+        } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
+      }));
     }
+
+    if (!query) {
+      return res.status(200).json({
+        feeds: userFeeds,
+        message: userFeeds.length
+          ? "Showing services near you"
+          : "No search query provided",
+        searchType: userFeeds.length ? "near-you" : "none",
+        nearYou: userFeeds
+      });
+    }
+
     // 1. Smart keyword search
     let feeds = await smartFeedSearch(query, 20);
     feeds = feeds.map(feed => ({
@@ -125,29 +152,38 @@ exports.searchFeeds = async (req, res) => {
       } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
     }));
 
-    if (feeds.length >= 5) {
-      return res.status(200).json({
-        feeds: feeds.slice(0, 15),
-        searchType: "text",
-        message: `Found ${feeds.length} matches`
-      });
-    }
-
-    // 2. Fallback to DeepSeek semantic search
+    // 2. DeepSeek AI search (always try)
     const aiFeeds = await deepseekAISearch(query, 15);
-    if (aiFeeds.length > 0) {
-      return res.status(200).json({
-        feeds: aiFeeds,
-        searchType: "ai",
-        message: `Found ${aiFeeds.length} results (AI search)`
-      });
+
+    // 3. Merge (dedupe, prioritize nearYou)
+    const seen = new Set();
+    const addAndMark = arr => arr.filter(f => {
+      if (seen.has(f._id.toString())) return false;
+      seen.add(f._id.toString());
+      return true;
+    });
+    const combinedFeeds = [
+      ...addAndMark(userFeeds),
+      ...addAndMark(feeds),
+      ...addAndMark(aiFeeds)
+    ].slice(0, 20);
+
+    let searchType = "combined";
+    let message = `Found ${combinedFeeds.length} results`;
+    if (userFeeds.length > 0) {
+      message += " (includes services near you)";
+    } else if (aiFeeds.length > 0) {
+      message += " (AI powered)";
+      searchType = "ai";
+    } else if (feeds.length > 0) {
+      searchType = "text";
     }
 
-    // 3. Fallback to basic results
     return res.status(200).json({
-      feeds,
-      searchType: "text-fallback",
-      message: `Found ${feeds.length} results (basic search)`
+      feeds: combinedFeeds,
+      searchType,
+      message,
+      nearYou: userFeeds
     });
   } catch (err) {
     res.status(200).json({ feeds: [], searchType: "error", error: "Search service temporarily unavailable" });
@@ -167,8 +203,8 @@ exports.getSearchSuggestions = async (req, res) => {
         { description: { $regex: query, $options: 'i' } }
       ]
     })
-    .limit(12)
-    .populate("user", "username serviceType");
+      .limit(12)
+      .populate("user", "username serviceType");
     const suggestions = new Set();
     feeds.forEach(feed => {
       if (feed.title?.toLowerCase().includes(query.toLowerCase())) suggestions.add(feed.title);

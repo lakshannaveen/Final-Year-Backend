@@ -59,6 +59,6 @@ app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/feed', require('./routes/feedRoutes'));
 app.use("/api/messages", require("./routes/messageRoutes")(io));
 app.use('/api', require('./routes/searchRoutes'));
-
+app.use('/api', require('./routes/huggingfaceRoutes'));
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

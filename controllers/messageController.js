@@ -8,8 +8,6 @@ exports.sendMessage = (io) => async (req, res) => {
     const { text, postId } = req.body;
     const senderId = req.user.id;
 
-    console.log("📤 Sending message - Sender:", senderId, "Recipient:", recipientId, "Text:", text);
-
     if (!text || !recipientId) {
       return res.status(400).json({ error: "Text and recipient are required." });
     }
@@ -44,17 +42,12 @@ exports.sendMessage = (io) => async (req, res) => {
       createdAt: message.createdAt,
     };
 
-    console.log("✅ Message created:", formatted);
-
     // Real-time delivery to both users with proper formatting
     const recipientMessage = { ...formatted };
     const senderMessage = { 
       ...formatted, 
       sender: "me" // Mark as "me" for sender
     };
-
-    console.log("🔊 Emitting to recipient:", recipientId, recipientMessage);
-    console.log("🔊 Emitting to sender:", senderId, senderMessage);
 
     // Emit to both users via Socket.IO
     io.to(recipientId).emit("receiveMessage", recipientMessage);
@@ -63,7 +56,7 @@ exports.sendMessage = (io) => async (req, res) => {
     // Return sender-formatted message for the API response
     res.status(201).json({ message: senderMessage });
   } catch (err) {
-    console.error("❌ Send message error:", err);
+    console.error("Send message error:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -73,8 +66,6 @@ exports.getMessages = async (req, res) => {
     const userId = req.user.id;
     const { recipientId } = req.params;
     const { postId } = req.query;
-
-    console.log("📥 Fetching messages - User:", userId, "Recipient:", recipientId);
 
     let query = {
       $or: [
@@ -102,11 +93,9 @@ exports.getMessages = async (req, res) => {
       createdAt: msg.createdAt,
     }));
 
-    console.log(`📨 Found ${formatted.length} messages`);
-
     res.json({ messages: formatted });
   } catch (err) {
-    console.error("❌ Get messages error:", err);
+    console.error("Get messages error:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -114,16 +103,11 @@ exports.getMessages = async (req, res) => {
 // Get inbox with chat summaries
 exports.getInbox = async (req, res) => {
   try {
-    // Debug: Check authentication
     if (!req.user || !req.user.id) {
-      console.error("❌ getInbox error: req.user not set. Are you authenticated?");
       return res.status(401).json({ error: "Authentication required" });
     }
 
     const userId = req.user.id;
-
-    // Debug: Log userId
-    console.log("📨 Fetching inbox for user:", userId);
 
     // Find all messages involving this user, latest first
     const messages = await Message.find({
@@ -154,12 +138,9 @@ exports.getInbox = async (req, res) => {
 
     const chatSummaries = Array.from(chatMap.values());
 
-    // Debug: Log result
-    console.log(`📂 Inbox - Found ${chatSummaries.length} chats for user ${userId}`);
-
     res.json({ chats: chatSummaries });
   } catch (err) {
-    console.error("❌ getInbox internal error:", err);
+    console.error("getInbox internal error:", err);
     res.status(500).json({ error: "Server error", details: err?.message });
   }
 };

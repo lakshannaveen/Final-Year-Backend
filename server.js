@@ -49,7 +49,6 @@ io.use((socket, next) => {
   }
 
   if (!token) {
-    console.log("❌ Socket connection rejected: No JWT token in cookies");
     return next(new Error("Authentication error: No token provided"));
   }
 
@@ -57,41 +56,27 @@ io.use((socket, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     socket.userId = decoded.id;
     socket.username = decoded.username;
-    console.log("✅ Socket authenticated for user:", decoded.id, decoded.username);
     next();
   } catch (err) {
-    console.log("❌ Socket connection rejected: Invalid JWT token");
     return next(new Error("Authentication error: Invalid token"));
   }
 });
 
 io.on("connection", (socket) => {
-  console.log("🔌 New Socket.IO connection:", socket.id, "User:", socket.userId);
-
   // Join user's room using authenticated userId from JWT
   if (socket.userId) {
-    console.log("🚪 User joining room:", socket.userId, "Socket:", socket.id);
     onlineUsers.set(socket.userId, socket.id);
     socket.join(socket.userId);
-    console.log("👥 Current online users:", Array.from(onlineUsers.keys()));
   }
 
   socket.on("sendMessage", ({ recipientId, message }) => {
-    console.log("📤 Socket sendMessage event:", { 
-      from: socket.userId,
-      to: recipientId, 
-      messageId: message._id
-    });
-    
     // Emit to recipient with original sender username
-    console.log("🔊 Emitting to recipient room:", recipientId);
     io.to(recipientId).emit("receiveMessage", { 
       ...message, 
       sender: message.sender // Keep original sender username for recipient
     });
     
     // Echo to sender as "me" (already handled by API, but double ensure)
-    console.log("🔊 Emitting to sender room:", socket.userId);
     io.to(socket.userId).emit("receiveMessage", { 
       ...message, 
       sender: "me" // Mark as "me" for sender
@@ -99,12 +84,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("🔌 Socket disconnected:", socket.id, "User:", socket.userId);
     if (socket.userId) {
       onlineUsers.delete(socket.userId);
-      console.log("🗑️ Removed user from online users:", socket.userId);
     }
-    console.log("👥 Remaining online users:", Array.from(onlineUsers.keys()));
   });
 });
 

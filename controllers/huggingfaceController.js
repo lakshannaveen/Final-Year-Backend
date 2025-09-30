@@ -1,7 +1,7 @@
 const fetch = global.fetch || require('node-fetch');
 
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-const MAX_USES = 5;
+const MAX_USES = 10; // Increased limit
 
 // Track usage with session storage
 const userUsage = new Map();
@@ -10,46 +10,115 @@ function getUserId(req) {
   return req.ip || req.headers['user-agent'] || 'anonymous';
 }
 
-// More reliable models
+// Better models for conversational AI
 const MODELS = [
+  "microsoft/DialoGPT-large",
   "microsoft/DialoGPT-medium",
-  "microsoft/DialoGPT-small", 
-  "google/flan-t5-base"
+  "google/flan-t5-xxl",
+  "facebook/blenderbot-400M-distill",
+  "microsoft/DialoGPT-small"
 ];
 
-// Enhanced platform knowledge base
+// Enhanced platform knowledge base with more natural responses
 const PLATFORM_KNOWLEDGE = {
   "what is doop": {
-    answer: "Doop is a comprehensive service marketplace platform designed to connect local service providers with customers seeking various services. It serves as a bridge between skilled professionals and people who need their services, making it easy to find, compare, and book services in your local area.",
-    details: "Key features include: service listings, provider profiles, direct messaging, booking system, reviews and ratings, secure payments, and location-based service discovery."
+    answer: "Doop is an innovative service marketplace that connects local service providers with customers in your community. Think of it as your go-to platform for finding trusted professionals for various services - from home repairs and tutoring to beauty services and more.\n\nWhat makes Doop special is our focus on building local connections while ensuring quality and reliability through our review system and secure payment processing.",
+    details: "🌟 Key Features:\n• Service Discovery: Find exactly what you need in your area\n• Verified Providers: All professionals are vetted for quality\n• Secure Booking: Easy scheduling and payment system\n• Real Reviews: Honest feedback from other customers\n• Direct Communication: Chat directly with providers"
   },
   "how does doop work": {
-    answer: "Doop operates on a simple yet effective model:\n\nFor Customers:\n1. Browse services by category or search\n2. View provider profiles with ratings and prices\n3. Contact providers directly or book services\n4. Pay securely through the platform\n5. Leave reviews after service completion\n\nFor Providers:\n1. Create a professional service profile\n2. List services with detailed descriptions and pricing\n3. Manage bookings and customer inquiries\n4. Build reputation through customer reviews\n5. Grow your business locally"
+    answer: "Doop works like having a personal assistant for all your service needs! Here's how it works:\n\n**For Customers:**\n1. **Search**: Tell us what service you need or browse categories\n2. **Discover**: View profiles, ratings, and prices of local providers\n3. **Connect**: Message providers directly to discuss your needs\n4. **Book**: Schedule the service at your convenience\n5. **Pay Securely**: Payment is processed safely after service completion\n6. **Review**: Share your experience to help others\n\n**For Service Providers:**\n1. **Create Profile**: Showcase your skills and experience\n2. **Get Discovered**: Appear in local searches\n3. **Grow Business**: Build your reputation through reviews\n4. **Get Paid**: Secure and timely payments"
   },
   "services available": {
-    answer: "Doop offers a wide range of service categories to meet diverse needs:\n\n• Home Services: Cleaning, Plumbing, Electrical, Painting, Carpentry\n• Education: Tutoring, Music Lessons, Language Classes, Academic Coaching\n• Professional: IT Support, Graphic Design, Writing, Consulting\n• Personal: Beauty Services, Fitness Training, Pet Care, Event Planning\n• Automotive: Car Repair, Detailing, Maintenance\n• Healthcare: Fitness Training, Wellness Services, Therapy\n\nNew categories are regularly added based on user demand and market trends."
+    answer: "Doop offers an extensive range of services to make your life easier! Here are our main categories:\n\n🏠 **Home Services**\n• Cleaning, Plumbing, Electrical, Painting, Carpentry\n• Gardening, Pest Control, Moving Help\n\n🎓 **Education & Tutoring**\n• Academic Subjects, Music Lessons, Language Classes\n• Test Preparation, Skill Development\n\n💼 **Professional Services**\n• IT Support, Graphic Design, Writing, Consulting\n• Marketing, Business Services\n\n💅 **Personal Care**\n• Beauty Services, Hair Styling, Massage Therapy\n• Fitness Training, Wellness Coaching\n\n🚗 **Automotive**\n• Car Repair, Detailing, Maintenance\n• Roadside Assistance\n\n🐾 **Pet Services**\n• Pet Sitting, Grooming, Training, Walking\n\nWe're constantly adding new categories based on what our community needs!"
   },
   "how to book": {
-    answer: "Booking a service on Doop is straightforward:\n\n1. **Search & Browse**: Use the search bar or browse categories\n2. **Compare Providers**: Check ratings, reviews, and pricing\n3. **Contact**: Message the provider directly or call them\n4. **Schedule**: Agree on date, time, and service details\n5. **Confirm**: Receive booking confirmation\n6. **Payment**: Pay securely after service completion\n\nYou can also save favorite providers for future bookings."
+    answer: "Booking a service on Doop is super simple! Here's your step-by-step guide:\n\n1. **Find Your Service**: Use our search bar or browse categories to find what you need\n2. **Compare Options**: Check out provider profiles, read reviews, and compare prices\n3. **Contact Providers**: Send messages to 1-3 providers that seem like a good fit\n4. **Discuss Details**: Chat about timing, specific requirements, and pricing\n5. **Confirm Booking**: Once you agree on details, confirm the booking\n6. **Get It Done**: The provider completes the service at the scheduled time\n7. **Secure Payment**: Pay through our protected system after you're satisfied\n8. **Share Feedback**: Leave a review to help other customers\n\n💡 **Pro Tip**: You can save favorite providers for future bookings!"
   },
   "become a provider": {
-    answer: "Join Doop as a service provider in these simple steps:\n\n1. **Sign Up**: Create a provider account with basic details\n2. **Verify**: Complete identity verification process\n3. **Create Profile**: Build your professional service profile\n4. **List Services**: Add your services with clear descriptions and pricing\n5. **Set Availability**: Define your working hours and areas\n6. **Go Live**: Start receiving customer inquiries and bookings\n\nBenefits for providers:\n• Reach more customers in your area\n• Build your reputation with reviews\n• Manage bookings efficiently\n• Secure payment processing\n• Grow your business steadily"
+    answer: "That's awesome you're interested in joining the Doop community as a service provider! Here's how to get started:\n\n**Getting Started Process:**\n1. **Sign Up**: Create your provider account (takes 2 minutes)\n2. **Build Your Profile**: Showcase your skills, experience, and portfolio\n3. **List Your Services**: Detail what you offer with clear pricing\n4. **Set Your Availability**: Define when you're available for work\n5. **Get Verified**: Complete our quick verification process\n6. **Go Live**: Start receiving booking requests!\n\n**Why Join Doop?**\n• **More Customers**: Reach people actively looking for your services\n• **Build Reputation**: Grow your business through authentic reviews\n• **Flexible Schedule**: Work when you want, where you want\n• **Secure Payments**: Get paid reliably without chasing invoices\n• **Support**: Access our provider support team when needed\n\nMany providers see a significant increase in bookings within their first month!"
   },
   "pricing structure": {
-    answer: "Doop offers flexible pricing options:\n\n**For Customers:**\n• Service prices set by providers\n• Transparent pricing with no hidden fees\n• Option for hourly or fixed-price services\n• Secure payment protection\n\n**For Providers:**\n• Free basic listing options\n• Premium features available\n• Commission-based model\n• No upfront costs for basic accounts\n\nAll payments are processed securely through the platform."
+    answer: "Doop is designed to be affordable and transparent for everyone. Here's how our pricing works:\n\n**For Customers:**\n• **Service Prices**: Set by providers based on market rates\n• **No Hidden Fees**: You see the total price upfront\n• **Payment Protection**: Your payment is secure until you're satisfied\n• **Free to Browse**: No cost to search and contact providers\n\n**For Service Providers:**\n• **Free Tier**: Basic listing with essential features\n• **Premium Options**: Enhanced visibility and advanced tools (optional)\n• **Competitive Commission**: We only succeed when you succeed\n• **No Upfront Costs**: Start free and upgrade as you grow\n\nWe believe in fair pricing that works for both customers and service professionals. The exact pricing for each service is clearly displayed on provider profiles."
   },
   "contact support": {
-    answer: "Doop Support Options:\n\n• **Help Center**: Comprehensive FAQs and guides\n• **Email Support**: support@doop.com (response within 24 hours)\n• **Live Chat**: Available during business hours\n• **Phone Support**: Call +1-800-DOOP-NOW\n• **Community Forum**: Connect with other users\n\nOur support team is dedicated to helping you have the best experience on our platform."
+    answer: "I'm here to help! For Doop support, we have multiple ways to get assistance:\n\n**Quick Help Options:**\n📞 **Phone Support**: 1-800-DOOP-NOW (Mon-Fri 9AM-6PM)\n✉️ **Email**: support@doop.com (24/7, response within 4 hours)\n💬 **Live Chat**: Available in the app (9AM-9PM daily)\n\n**Self-Service Resources:**\n• **Help Center**: Detailed guides and FAQs\n• **Community Forum**: Connect with other users\n• **Video Tutorials**: Step-by-step walkthroughs\n\n**Urgent Issues:**\nFor payment issues or account problems, our phone support provides the fastest resolution.\n\nDon't hesitate to reach out - we're committed to making your Doop experience smooth and enjoyable!"
   }
 };
 
-// Enhanced general knowledge responses
+// Enhanced general knowledge with more conversational responses
 const GENERAL_KNOWLEDGE = {
-  "sri lanka": "Sri Lanka, officially the Democratic Socialist Republic of Sri Lanka, is an island country in South Asia. It's known for its diverse landscapes ranging from rainforests and arid plains to highlands and sandy beaches. Key facts:\n• Capital: Sri Jayawardenepura Kotte\n• Commercial Capital: Colombo\n• Population: Approximately 22 million\n• Official Languages: Sinhala, Tamil\n• Currency: Sri Lankan Rupee (LKR)\n• Famous for: Tea production, cinnamon, gems, and beautiful tourism destinations",
-  "history": "I'd be happy to discuss historical topics! History encompasses the study of past events, particularly human affairs. Could you specify which historical period, civilization, or event you're interested in? For example: ancient civilizations, world wars, specific countries, or historical figures.",
-  "weather": "For accurate and current weather information, I recommend checking reliable weather services like:\n• Weather.com\n• AccuWeather\n• Your local meteorological service\n• Weather apps on your smartphone\n\nThese provide real-time forecasts, radar maps, and severe weather alerts specific to your location.",
-  "news": "For the latest news updates, I suggest checking reputable news sources such as:\n• BBC News\n• CNN\n• Reuters\n• Associated Press\n• Your local news channels\n\nThese sources provide verified, up-to-date information on current events worldwide."
+  "sri lanka": "Sri Lanka is a beautiful island nation in South Asia that I find quite fascinating! Here's what makes it special:\n\n🏝️ **Island Paradise**: Known as the 'Pearl of the Indian Ocean'\n🏛️ **Rich History**: Ancient kingdoms dating back 2500+ years\n🌿 **Biodiversity**: Incredible wildlife including elephants and leopards\n🍵 **Famous Exports**: World-renowned Ceylon tea and cinnamon\n🏄 **Tourist Hotspots**: Beautiful beaches, ancient cities, and lush mountains\n\nIt's a country with amazing cultural heritage and natural beauty that's definitely worth visiting!",
+  
+  "history": "History is such an interesting subject! It's like a giant story of everything that's brought us to where we are today. I can help with:\n\n• **Ancient Civilizations**: Egypt, Rome, Greece, Mesopotamia\n• **World History**: Major events and turning points\n• **Cultural History**: Arts, inventions, and social changes\n• **Historical Figures**: Influential people who shaped our world\n\nWhat specific historical topic or era are you curious about? I'd love to dive deeper into whatever interests you!",
+  
+  "weather": "I'd love to give you weather information, but for the most accurate and current conditions, I recommend checking:\n\n🌤️ **Reliable Weather Apps**:\n• Weather.com or their mobile app\n• AccuWeather for detailed forecasts\n• Your phone's built-in weather app\n• National Weather Service for official alerts\n\nThese sources provide real-time radar, hourly forecasts, and severe weather alerts specific to your exact location. Stay safe and prepared!",
+  
+  "news": "For the latest news, I suggest these trusted sources:\n\n📰 **Major News Outlets**:\n• BBC News for global coverage\n• Reuters for unbiased reporting\n• Associated Press for factual news\n• Local newspapers for community updates\n\n🔍 **News Aggregators**:\n• Google News for comprehensive coverage\n• Apple News for curated stories\n\nI recommend cross-referencing multiple sources to get a well-rounded perspective on current events!",
+  
+  "technology": "Technology is evolving so rapidly! It's amazing to see how it's transforming our world. I can discuss:\n\n🤖 **AI & Machine Learning**: How it's changing various industries\n📱 **Mobile Technology**: Latest smartphones and apps\n💻 **Computing**: Advances in hardware and software\n🌐 **Internet & Web**: Digital transformation trends\n🔬 **Emerging Tech**: VR, AR, blockchain, and more\n\nWhat specific technology topic interests you? I'd be happy to explore it with you!",
+  
+  "science": "Science is the process of understanding how our universe works - from the smallest particles to the vastness of space! I can help with:\n\n🔭 **Space & Astronomy**: Planets, stars, and cosmic phenomena\n🧬 **Biology & Life Sciences**: Animals, plants, and human biology\n⚛️ **Physics**: Laws that govern matter and energy\n🧪 **Chemistry**: Elements, compounds, and reactions\n🌍 **Earth Science**: Geology, weather, and climate\n\nWhat scientific topic would you like to explore? The world of science is full of fascinating discoveries!"
 };
+
+// Enhanced response generator for more natural conversations
+function generateEnhancedResponse(prompt, context = []) {
+  const lowerPrompt = prompt.toLowerCase().trim();
+  
+  // Check if this is a follow-up question
+  const lastMessage = context[context.length - 2]; // User's previous message
+  const isFollowUp = context.length > 1 && lastMessage && lastMessage.type === 'user';
+  
+  // Enhanced greeting responses
+  if (lowerPrompt.match(/(hi|hello|hey|greetings|good morning|good afternoon)/)) {
+    const greetings = [
+      "Hello! 👋 I'm your Doop AI assistant. How can I help you today?",
+      "Hi there! 😊 I'm here to assist with anything about Doop or answer your questions. What can I do for you?",
+      "Hey! Great to see you! I'm ready to help with Doop services or any questions you might have.",
+      "Greetings! I'm your friendly Doop assistant. What would you like to know about our platform or anything else?"
+    ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }
+  
+  // Enhanced thanks responses
+  if (lowerPrompt.match(/(thanks|thank you|appreciate it|cheers)/)) {
+    const thanks = [
+      "You're very welcome! 😊 Happy I could help. Is there anything else you'd like to know?",
+      "My pleasure! 👍 Let me know if you have any other questions about Doop or anything else.",
+      "Glad I could assist! 🎉 Don't hesitate to ask if you need anything else.",
+      "Anytime! 😄 I'm here whenever you need help or information."
+    ];
+    return thanks[Math.floor(Math.random() * thanks.length)];
+  }
+  
+  // Enhanced farewell responses
+  if (lowerPrompt.match(/(bye|goodbye|see you|farewell|have a good)/)) {
+    const farewells = [
+      "Goodbye! 👋 Thanks for chatting with me. Come back anytime you need help!",
+      "See you later! 😊 It was great helping you today.",
+      "Take care! 👍 Hope to see you again soon on Doop!",
+      "Have a wonderful day! 🌟 Don't hesitate to return if you have more questions."
+    ];
+    return farewells[Math.floor(Math.random() * farewells.length)];
+  }
+  
+  // Check platform knowledge with better matching
+  for (const [keyword, knowledge] of Object.entries(PLATFORM_KNOWLEDGE)) {
+    if (lowerPrompt.includes(keyword) || 
+        (keyword.includes('doop') && lowerPrompt.includes('doop')) ||
+        (isFollowUp && lastMessage.content.toLowerCase().includes(keyword))) {
+      return knowledge.answer;
+    }
+  }
+  
+  // Check general knowledge
+  for (const [keyword, response] of Object.entries(GENERAL_KNOWLEDGE)) {
+    if (lowerPrompt.includes(keyword)) {
+      return response;
+    }
+  }
+  
+  return null; // Let HuggingFace handle it
+}
 
 exports.aiChat = async (req, res) => {
   try {
@@ -73,7 +142,7 @@ exports.aiChat = async (req, res) => {
       });
     }
 
-    const { prompt } = req.body;
+    const { prompt, context = [] } = req.body;
     
     // Validate prompt
     if (!prompt || typeof prompt !== "string" || prompt.trim().length < 2) {
@@ -84,63 +153,30 @@ exports.aiChat = async (req, res) => {
       return res.status(400).json({ error: "Question is too long. Please keep it under 500 characters." });
     }
 
-    const lowerPrompt = prompt.toLowerCase().trim();
+    const cleanPrompt = prompt.trim();
     let answer = "";
     let source = "knowledge_base";
 
-    // Enhanced platform question detection with fuzzy matching
-    const platformKeywords = ['doop', 'service', 'provider', 'book', 'booking', 'price', 'cost', 'how to', 'what is', 'clean', 'plumb', 'tutor', 'repair', 'support', 'help'];
-    const isPlatformQuestion = platformKeywords.some(keyword => 
-      lowerPrompt.includes(keyword) && 
-      (lowerPrompt.includes('doop') || lowerPrompt.length < 50) // Assume short questions are platform-related
-    );
-
-    // Check for specific platform questions first
-    if (isPlatformQuestion) {
-      // Enhanced question matching
-      if (lowerPrompt.includes('what is doop') || lowerPrompt.includes('tell me about doop')) {
-        answer = PLATFORM_KNOWLEDGE["what is doop"].answer;
-        if (PLATFORM_KNOWLEDGE["what is doop"].details) {
-          answer += "\n\n" + PLATFORM_KNOWLEDGE["what is doop"].details;
-        }
-      }
-      else if (lowerPrompt.includes('how does doop work') || lowerPrompt.includes('how do i use doop')) {
-        answer = PLATFORM_KNOWLEDGE["how does doop work"].answer;
-      }
-      else if (lowerPrompt.includes('service') && (lowerPrompt.includes('what') || lowerPrompt.includes('available') || lowerPrompt.includes('offer'))) {
-        answer = PLATFORM_KNOWLEDGE["services available"].answer;
-      }
-      else if (lowerPrompt.includes('how to book') || lowerPrompt.includes('book a service') || lowerPrompt.includes('make appointment')) {
-        answer = PLATFORM_KNOWLEDGE["how to book"].answer;
-      }
-      else if (lowerPrompt.includes('become a provider') || lowerPrompt.includes('post service') || lowerPrompt.includes('list service')) {
-        answer = PLATFORM_KNOWLEDGE["become a provider"].answer;
-      }
-      else if (lowerPrompt.includes('price') || lowerPrompt.includes('cost') || lowerPrompt.includes('how much')) {
-        answer = PLATFORM_KNOWLEDGE["pricing structure"].answer;
-      }
-      else if (lowerPrompt.includes('contact') || lowerPrompt.includes('support') || lowerPrompt.includes('help')) {
-        answer = PLATFORM_KNOWLEDGE["contact support"].answer;
-      }
-    }
-
-    // If no platform answer found, check general knowledge
-    if (!answer) {
-      for (const [keyword, response] of Object.entries(GENERAL_KNOWLEDGE)) {
-        if (lowerPrompt.includes(keyword)) {
-          answer = response;
-          break;
-        }
-      }
-    }
-
-    // If still no answer, try HuggingFace models
-    if (!answer) {
+    // Try enhanced response generator first
+    const enhancedResponse = generateEnhancedResponse(cleanPrompt, context);
+    if (enhancedResponse) {
+      answer = enhancedResponse;
+    } else {
+      // If no enhanced response, try HuggingFace with better prompts
       let usedHuggingFace = false;
       
       for (const model of MODELS) {
         try {
           console.log(`Trying model: ${model}`);
+          
+          // Enhanced prompt for better responses
+          const conversationContext = context.length > 0 ? 
+            `Previous context: ${context.slice(-4).map(msg => `${msg.type}: ${msg.content}`).join(' | ')}. ` : '';
+          
+          const enhancedPrompt = `${conversationContext}User question: "${cleanPrompt}". 
+          Please provide a helpful, conversational, and accurate response. 
+          If this is about service marketplaces, local services, or online platforms, focus on being informative yet friendly. 
+          If you're unsure, be honest about limitations while still being helpful.`;
           
           const hfRes = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
             method: "POST",
@@ -149,16 +185,18 @@ exports.aiChat = async (req, res) => {
               "Content-Type": "application/json"
             },
             body: JSON.stringify({ 
-              inputs: `Please provide a helpful and accurate response to this question: "${prompt}"`,
+              inputs: enhancedPrompt,
               parameters: {
-                max_length: 250,
-                temperature: 0.7,
+                max_length: 300,
+                temperature: 0.8,
                 do_sample: true,
                 return_full_text: false,
-                repetition_penalty: 1.2
+                repetition_penalty: 1.3,
+                top_p: 0.9,
+                top_k: 50
               }
             }),
-            timeout: 15000
+            timeout: 20000
           });
 
           if (hfRes.status === 404 || hfRes.status === 503) {
@@ -167,17 +205,31 @@ exports.aiChat = async (req, res) => {
 
           if (hfRes.ok) {
             const data = await hfRes.json();
+            let generatedText = "";
             
             if (data.generated_text) {
-              answer = data.generated_text;
-              usedHuggingFace = true;
-              source = "ai_model";
-              break;
+              generatedText = data.generated_text;
             } else if (Array.isArray(data) && data[0]?.generated_text) {
-              answer = data[0].generated_text;
-              usedHuggingFace = true;
-              source = "ai_model";
-              break;
+              generatedText = data[0].generated_text;
+            }
+            
+            // Clean up the response
+            if (generatedText) {
+              // Remove the prompt if it's repeated
+              if (generatedText.includes(cleanPrompt)) {
+                generatedText = generatedText.replace(cleanPrompt, '').trim();
+              }
+              
+              // Remove any weird prefixes or suffixes
+              generatedText = generatedText.replace(/^(Response:|Answer:|🤖|👤)/, '').trim();
+              
+              // Ensure reasonable length
+              if (generatedText.length > 50 && generatedText.length < 400) {
+                answer = generatedText;
+                usedHuggingFace = true;
+                source = "ai_model";
+                break;
+              }
             }
           }
         } catch (modelError) {
@@ -188,29 +240,32 @@ exports.aiChat = async (req, res) => {
 
       // Final fallback for unanswered questions
       if (!answer) {
-        answer = `I understand you're asking about "${prompt}". `;
+        const lowerPrompt = cleanPrompt.toLowerCase();
         
-        if (isPlatformQuestion) {
-          answer += "This appears to be related to our Doop platform. I'd be happy to help you with:\n\n• Understanding how Doop works\n• Finding and booking services\n• Becoming a service provider\n• Platform features and pricing\n• Contacting support\n\nCould you please rephrase your question or ask about one of these specific topics?";
+        if (lowerPrompt.includes('doop') || 
+            lowerPrompt.includes('service') || 
+            lowerPrompt.includes('book') || 
+            lowerPrompt.includes('provider')) {
+          answer = `I understand you're asking about "${cleanPrompt}". This seems related to the Doop platform! \n\nI can definitely help you with:\n\n• Understanding how Doop works\n• Finding and booking services\n• Becoming a service provider\n• Platform features and pricing\n• Contacting support\n\nCould you tell me a bit more about what specific aspect you'd like to know?`;
         } else {
-          answer += "While I'm designed to provide helpful information, I may not have enough context about this specific topic. For the most accurate and current information, I recommend checking reliable sources or rephrasing your question with more details.";
+          answer = `I understand you're asking about "${cleanPrompt}". While I'm designed to provide helpful information, I may not have enough specific knowledge about this topic to give you a comprehensive answer.\n\nFor the most accurate and current information, I'd recommend checking reliable specialized sources or rephrasing your question with more context. I'm great at helping with Doop platform questions, general knowledge, and various other topics though!`;
         }
         source = "fallback";
       }
     }
 
-    // Clean and format the response
+    // Final response cleaning and enhancement
     answer = answer.trim();
     
-    // Remove repetitive or low-quality content
-    if (answer.includes(prompt) && answer.length > prompt.length + 20) {
-      answer = answer.replace(prompt, '').trim();
+    // Ensure the response doesn't just repeat the question
+    if (answer.toLowerCase().includes(cleanPrompt.toLowerCase()) && answer.length < cleanPrompt.length + 30) {
+      answer = "I understand your question, but I need a bit more context to provide a helpful answer. Could you rephrase or provide more details about what you're looking for?";
+      source = "context_request";
     }
     
-    // Ensure response quality
-    if (answer.length < 10) {
-      answer = "I received your question but couldn't generate a sufficiently detailed response. This might be due to the complexity of the question or limitations in my current knowledge. Please try rephrasing or asking about a different topic.";
-      source = "quality_fallback";
+    // Add conversational elements for very short responses
+    if (answer.length < 20 && source !== "context_request") {
+      answer += " Is there anything specific you'd like to know more about?";
     }
 
     // Increment usage
@@ -221,7 +276,7 @@ exports.aiChat = async (req, res) => {
       uses: currentUses + 1,
       max: MAX_USES,
       source,
-      question: prompt // Return the original question for frontend display
+      question: cleanPrompt
     });
 
   } catch (error) {

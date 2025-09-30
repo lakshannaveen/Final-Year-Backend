@@ -32,6 +32,9 @@ mongoose.connect(process.env.MONGO_URI , {
 .then(() => console.log('✅ MongoDB connected successfully'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
+// Make io accessible to routes
+app.set('io', io);
+
 // Socket.IO user-room management with JWT cookie authentication
 const onlineUsers = new Map(); // userId: socket.id
 

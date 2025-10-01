@@ -112,17 +112,17 @@ async function smartFeedSearch(query, limit = 20) {
     })
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate("user", "username profilePic location serviceType");
+      .populate("user", "username profilePic location serviceType status");
   }
   return await Feed.find(mongoQuery)
     .sort({ createdAt: -1 })
     .limit(limit)
-    .populate("user", "username profilePic location serviceType");
+    .populate("user", "username profilePic location serviceType status");
 }
 
 async function deepseekAISearch(query, limit = 15) {
   if (!DEEPSEEK_API_KEY) return [];
-  const feeds = await Feed.find({}).limit(200).populate("user", "username profilePic location serviceType");
+  const feeds = await Feed.find({}).limit(200).populate("user", "username profilePic location serviceType status");
   const documents = feeds.map(feed => ({
     id: feed._id.toString(),
     text: `${feed.title} ${feed.description} ${feed.location} ${feed.user?.serviceType || ""} ${feed.user?.username || ""}`,
@@ -152,7 +152,8 @@ async function deepseekAISearch(query, limit = 15) {
         profilePic: feed.user.profilePic || "",
         location: feed.user.location || "",
         serviceType: feed.user.serviceType || "",
-      } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
+        status: feed.user.status || ""
+      } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
     }));
   } catch (err) {
     return [];
@@ -287,7 +288,8 @@ exports.chatWithAI = async (req, res) => {
           profilePic: feed.user.profilePic || "",
           location: feed.user.location || "",
           serviceType: feed.user.serviceType || "",
-        } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
+          status: feed.user.status || "" // <-- ADD THIS
+        } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
       }));
       // 2. DeepSeek AI search (optional, only if API enabled)
       let aiFeeds = [];
@@ -301,7 +303,17 @@ exports.chatWithAI = async (req, res) => {
         seen.add(f._id.toString());
         return true;
       });
-      suggestions = [...addAndMark(feeds), ...addAndMark(aiFeeds)].slice(0, 5);
+      suggestions = [...addAndMark(feeds), ...addAndMark(aiFeeds)].slice(0, 5).map(sug => ({
+        ...sug,
+        user: sug.user ? {
+          _id: sug.user._id,
+          username: sug.user.username,
+          profilePic: sug.user.profilePic || "",
+          location: sug.user.location || "",
+          serviceType: sug.user.serviceType || "",
+          status: sug.user.status || "" // <-- ADD THIS
+        } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
+      }));
       serviceSearchMeta = {
         attempted: true,
         query: cleanPrompt,

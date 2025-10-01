@@ -311,7 +311,7 @@ exports.chatWithAI = async (req, res) => {
           profilePic: sug.user.profilePic || "",
           location: sug.user.location || "",
           serviceType: sug.user.serviceType || "",
-          status: sug.user.status || "" // <-- ADD THIS
+          status: sug.user.status || "" 
         } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
       }));
       serviceSearchMeta = {

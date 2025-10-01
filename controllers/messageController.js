@@ -75,7 +75,11 @@ exports.getMessages = async (req, res) => {
   try {
     const userId = req.user.id;
     const { recipientId } = req.params;
-    const { postId } = req.query;
+    const { postId, page = 1, limit = 20 } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
 
     let query = {
       $or: [
@@ -86,12 +90,17 @@ exports.getMessages = async (req, res) => {
     if (postId) query.postId = postId;
 
     const messages = await Message.find(query)
-      .sort("createdAt")
+      .sort({ createdAt: -1 }) // Get latest messages first for pagination
+      .skip(skip)
+      .limit(limitNum)
       .populate("sender", "username profilePic")
       .populate("recipient", "username profilePic")
       .lean();
 
-    const formatted = messages.map((msg) => ({
+    // Reverse to show oldest first in UI
+    const reversedMessages = messages.reverse();
+
+    const formatted = reversedMessages.map((msg) => ({
       _id: msg._id,
       sender: msg.sender._id.toString() === userId ? "me" : msg.sender.username,
       senderId: msg.sender._id.toString(),
@@ -263,6 +272,7 @@ exports.markAllAsRead = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
 // Mark all messages in inbox as read
 exports.markAllInboxRead = async (req, res) => {
   try {

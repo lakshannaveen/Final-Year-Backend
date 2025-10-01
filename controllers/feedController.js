@@ -8,6 +8,9 @@ const b2 = new B2({
   applicationKey: process.env.B2_APPLICATION_KEY,
 });
 
+// Helper to select user fields including status
+const userSelect = "username profilePic status";
+
 exports.createFeed = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -62,7 +65,7 @@ exports.getFeedsPaginated = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("user", "username profilePic"),
+        .populate("user", userSelect),
       Feed.countDocuments(),
     ]);
 
@@ -81,7 +84,7 @@ exports.getFeedsPaginated = async (req, res) => {
 exports.getFeedById = async (req, res) => {
   try {
     const { id } = req.params;
-    const feed = await Feed.findById(id).populate("user", "username serviceType profilePic");
+    const feed = await Feed.findById(id).populate("user", "username serviceType profilePic status");
     if (!feed) return res.status(404).json({ errors: { feed: "Post not found" } });
     res.status(200).json({ feed });
   } catch (err) {
@@ -135,7 +138,7 @@ exports.getMyFeedsPaginated = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("user", "username profilePic"),
+        .populate("user", userSelect),
       Feed.countDocuments({ user: userId }),
     ]);
 
@@ -208,6 +211,8 @@ exports.updateFeed = async (req, res) => {
     res.status(500).json({ errors: { server: "Failed to update post" } });
   }
 };
+
+// Public feeds paginated, include status in populated user info
 exports.getPublicFeedsPaginated = async (req, res) => {
   try {
     const { idOrUsername } = req.params;
@@ -230,7 +235,7 @@ exports.getPublicFeedsPaginated = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("user", "username profilePic"),
+        .populate("user", userSelect),
       Feed.countDocuments({ user: user._id }),
     ]);
 
@@ -239,7 +244,7 @@ exports.getPublicFeedsPaginated = async (req, res) => {
       page,
       totalPages: Math.ceil(total / limit),
       total,
-      user: { _id: user._id, username: user.username, profilePic: user.profilePic }
+      user: { _id: user._id, username: user.username, profilePic: user.profilePic, status: user.status }
     });
   } catch (err) {
     console.error("Get public paginated feeds error:", err);

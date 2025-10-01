@@ -55,17 +55,17 @@ async function smartFeedSearch(query, limit = 20) {
     })
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate("user", "username profilePic location serviceType");
+      .populate("user", "username profilePic location serviceType status");
   }
   return await Feed.find(mongoQuery)
     .sort({ createdAt: -1 })
     .limit(limit)
-    .populate("user", "username profilePic location serviceType");
+    .populate("user", "username profilePic location serviceType status");
 }
 
 async function deepseekAISearch(query, limit = 15) {
   if (!DEEPSEEK_API_KEY) return [];
-  const feeds = await Feed.find({}).limit(200).populate("user", "username profilePic location serviceType");
+  const feeds = await Feed.find({}).limit(200).populate("user", "username profilePic location serviceType status");
   const documents = feeds.map(feed => ({
     id: feed._id.toString(),
     text: `${feed.title} ${feed.description} ${feed.location} ${feed.user?.serviceType || ""} ${feed.user?.username || ""}`,
@@ -95,7 +95,8 @@ async function deepseekAISearch(query, limit = 15) {
         profilePic: feed.user.profilePic || "",
         location: feed.user.location || "",
         serviceType: feed.user.serviceType || "",
-      } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
+        status: feed.user.status || ""
+      } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
     }));
   } catch (err) {
     return [];
@@ -107,7 +108,7 @@ async function getNearestLocationFeeds(user, limit = 10) {
   return await Feed.find({ location: new RegExp(user.location, "i") })
     .sort({ createdAt: -1 })
     .limit(limit)
-    .populate("user", "username profilePic location serviceType");
+    .populate("user", "username profilePic location serviceType status");
 }
 
 exports.searchFeeds = async (req, res) => {
@@ -124,7 +125,8 @@ exports.searchFeeds = async (req, res) => {
           profilePic: feed.user.profilePic || "",
           location: feed.user.location || "",
           serviceType: feed.user.serviceType || "",
-        } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
+          status: feed.user.status || ""
+        } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
       }));
     }
 
@@ -149,7 +151,8 @@ exports.searchFeeds = async (req, res) => {
         profilePic: feed.user.profilePic || "",
         location: feed.user.location || "",
         serviceType: feed.user.serviceType || "",
-      } : { _id: "", username: "", profilePic: "", location: "", serviceType: "" }
+        status: feed.user.status || ""
+      } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
     }));
 
     // 2. DeepSeek AI search (always try)
@@ -204,7 +207,7 @@ exports.getSearchSuggestions = async (req, res) => {
       ]
     })
       .limit(12)
-      .populate("user", "username serviceType");
+      .populate("user", "username serviceType status");
     const suggestions = new Set();
     feeds.forEach(feed => {
       if (feed.title?.toLowerCase().includes(query.toLowerCase())) suggestions.add(feed.title);

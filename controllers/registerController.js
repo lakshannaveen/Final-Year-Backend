@@ -3,6 +3,9 @@ const bcrypt = require('bcrypt');
 const passport = require("passport");
 const jwt = require('jsonwebtoken');
 
+// Add nodemailer
+const nodemailer = require('nodemailer');
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 
@@ -12,6 +15,17 @@ const cookieOptions = {
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   maxAge: 60 * 60 * 1000,
 };
+
+// Nodemailer transporter (configure these env variables in your .env file)
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  port: process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_USER, // your email
+    pass: process.env.EMAIL_PASS, // your email password or app password
+  },
+});
 
 // Register
 exports.register = async (req, res) => {
@@ -56,6 +70,23 @@ exports.register = async (req, res) => {
     });
 
     await user.save();
+
+    // Send thank you/verification email (no verification link, just info)
+    try {
+      await transporter.sendMail({
+        from: `"Your App Name" <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject: "Thanks for creating an account",
+        html: `<h2>Welcome, ${user.username}!</h2>
+        <p>Thank you for creating an account with us. Your registration was successful.</p>
+        <p>If you did not create this account, please ignore this email.</p>
+        <br/>
+        <p>Best regards,<br/>The Team</p>`,
+      });
+    } catch (mailErr) {
+      // Don't fail registration if email fails; just log.
+      console.error("Email send error:", mailErr);
+    }
 
     // Generate JWT
     const token = jwt.sign(

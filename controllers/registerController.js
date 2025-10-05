@@ -82,7 +82,6 @@ exports.register = async (req, res) => {
           <table align="center" width="100%" style="max-width: 520px; background: #fff; border-radius: 14px; box-shadow:0 2px 10px rgba(0,0,0,0.10); overflow: hidden;">
             <tr>
               <td style="background: linear-gradient(90deg,#0ea47a,#1bbb8c); padding: 32px 0 20px 0; text-align: center;">
-                <img src="https://i.postimg.cc/4yQXcJb3/doop-logo.png" alt="Doop Sri Lanka" style="height: 48px; margin-bottom: 8px;" />
                 <h1 style="color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; font-size: 2rem;">Welcome, ${user.username}!</h1>
               </td>
             </tr>

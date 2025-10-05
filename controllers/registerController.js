@@ -71,17 +71,46 @@ exports.register = async (req, res) => {
 
     await user.save();
 
-    // Send thank you/verification email (no verification link, just info)
+    // Send thank you/verification email (professional, Doop Team Sri Lanka)
     try {
       await transporter.sendMail({
-        from: `"Your App Name" <${process.env.EMAIL_USER}>`,
+        from: `"Doop Sri Lanka" <${process.env.EMAIL_USER}>`,
         to: user.email,
-        subject: "Thanks for creating an account",
-        html: `<h2>Welcome, ${user.username}!</h2>
-        <p>Thank you for creating an account with us. Your registration was successful.</p>
-        <p>If you did not create this account, please ignore this email.</p>
-        <br/>
-        <p>Best regards,<br/>The Team</p>`,
+        subject: "Welcome to Doop – Account Created Successfully!",
+        html: `
+        <div style="background: #f3f7fa; padding: 40px 0;">
+          <table align="center" width="100%" style="max-width: 520px; background: #fff; border-radius: 14px; box-shadow:0 2px 10px rgba(0,0,0,0.10); overflow: hidden;">
+            <tr>
+              <td style="background: linear-gradient(90deg,#0ea47a,#1bbb8c); padding: 32px 0 20px 0; text-align: center;">
+                <img src="https://i.postimg.cc/4yQXcJb3/doop-logo.png" alt="Doop Sri Lanka" style="height: 48px; margin-bottom: 8px;" />
+                <h1 style="color: #fff; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; font-size: 2rem;">Welcome, ${user.username}!</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 32px 30px 24px 30px; font-family: 'Segoe UI', Arial, sans-serif; color: #2d3748;">
+                <p style="font-size: 1.1rem; margin: 0 0 18px 0;">Thank you for joining <b>Doop</b>! Your account has been created successfully.</p>
+                <p style="margin: 0 0 14px 0;">
+                  You can now access all our platform features. If you did not create this account, please ignore this email.
+                </p>
+                <div style="margin: 30px 0 14px 0; text-align: center;">
+                  <a href="${process.env.CLIENT_URL || "http://localhost:3000"}" 
+                    style="background: linear-gradient(90deg,#0ea47a,#1bbb8c); color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: bold; font-size: 1rem; display: inline-block;">
+                    Go to Doop 
+                  </a>
+                </div>
+                <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 0.96rem;">
+                  If you have any questions or need support, feel free to reply to this email. We're here for you!
+                </p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 16px 0;">
+                <p style="margin: 0; font-size: 0.95rem; color: #888;">With warm regards,<br><b>The Doop Team</b></p>
+              </td>
+            </tr>
+          </table>
+          <div style="text-align: center; color: #bdbdbd; font-size: 0.92rem; margin-top: 20px;">
+            &copy; ${new Date().getFullYear()} Doop. All rights reserved.
+          </div>
+        </div>
+        `,
       });
     } catch (mailErr) {
       // Don't fail registration if email fails; just log.

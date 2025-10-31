@@ -92,15 +92,6 @@ io.on("connection", (socket) => {
     }
   });
 });
-// Add this root route handler
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Server is running successfully!',
-    status: 'OK',
-    timestamp: new Date().toISOString()
-  });
-});
-
 
 // Routes
 app.use('/api/auth', require('./routes/userRoutes'));
@@ -110,6 +101,15 @@ app.use("/api/messages", require("./routes/messageRoutes")(io));
 app.use('/api', require('./routes/searchRoutes'));
 app.use('/api', require('./routes/aiAssistantRoutes'));
 app.use('/api/reviews', require('./routes/reviewsRoutes')); // Updated this line
+
+// Root route handler
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Server is running successfully!',
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

@@ -92,6 +92,15 @@ io.on("connection", (socket) => {
     }
   });
 });
+// Add this root route handler
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Server is running successfully!',
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
+});
+
 
 // Routes
 app.use('/api/auth', require('./routes/userRoutes'));

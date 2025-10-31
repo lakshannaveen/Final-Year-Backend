@@ -25,10 +25,8 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-mongoose.connect(process.env.MONGO_URI , {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+// Remove deprecated options from mongoose connection
+mongoose.connect(process.env.MONGO_URI)
 .then(() => console.log('✅ MongoDB connected successfully'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
@@ -100,14 +98,26 @@ app.use('/api/feed', require('./routes/feedRoutes'));
 app.use("/api/messages", require("./routes/messageRoutes")(io));
 app.use('/api', require('./routes/searchRoutes'));
 app.use('/api', require('./routes/aiAssistantRoutes'));
-app.use('/api/reviews', require('./routes/reviewsRoutes')); // Updated this line
+app.use('/api/reviews', require('./routes/reviewsRoutes'));
 
-// Root route handler
+// Improved Root route handler - Add this before other routes
 app.get('/', (req, res) => {
-  res.json({ 
+  console.log('✅ Root route accessed');
+  res.status(200).json({ 
     message: 'Server is running successfully!',
     status: 'OK',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    port: process.env.PORT,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Add a catch-all route for undefined routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.originalUrl,
+    method: req.method
   });
 });
 

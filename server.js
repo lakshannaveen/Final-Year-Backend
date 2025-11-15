@@ -96,6 +96,7 @@ app.use('/api', require('./routes/aiAssistantRoutes'));
 app.use('/api/reviews', require('./routes/reviewsRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
+app.use('/api/contact', require('./routes/contactRoutes'));
 
 // Root route
 app.get('/', (req, res) => {

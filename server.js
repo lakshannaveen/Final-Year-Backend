@@ -94,6 +94,7 @@ app.use("/api/messages", require("./routes/messageRoutes")(io));
 app.use('/api', require('./routes/searchRoutes'));
 app.use('/api', require('./routes/aiAssistantRoutes'));
 app.use('/api/reviews', require('./routes/reviewsRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
 
 // Root route
 app.get('/', (req, res) => {

@@ -1,14 +1,3 @@
-/**
- * routes/manageServiceRoutes.js
- *
- * Routes for the management UI that lists all services and allows deletion of services
- * and deletion of admin users. These routes are intentionally left without authentication
- * middleware per the user's request — use with caution.
- *
- * Mount in your server e.g.:
- *    app.use('/api/admin/manage', require('./routes/manageServiceRoutes'));
- */
-
 const express = require('express');
 const router = express.Router();
 const {

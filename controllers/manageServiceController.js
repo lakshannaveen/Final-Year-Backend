@@ -1,11 +1,3 @@
-/**
- * controllers/manageServiceController.js
- *
- * Controller to allow admins (or management UI) to list and remove services (feeds)
- * and to delete admin users. Per user's request these endpoints do not require
- * authentication (no middleware applied here). Use carefully.
- */
-
 const Feed = require('../models/Feed');
 const User = require('../models/User');
 

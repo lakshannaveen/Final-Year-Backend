@@ -65,7 +65,7 @@ exports.getUserById = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
   try {
-    const { username, email, phone, website, bio, status } = req.body;
+    const { username, email, phone, website, bio, status, profilePic } = req.body;
     
     const user = await User.findByIdAndUpdate(
       req.params.id,
@@ -76,6 +76,8 @@ exports.updateUser = async (req, res) => {
         website, 
         bio, 
         status,
+        // include profilePic if provided (if undefined it will set undefined; using conditional below)
+        ...(profilePic !== undefined ? { profilePic } : {}),
         updatedAt: new Date()
       },
       { new: true, runValidators: true }

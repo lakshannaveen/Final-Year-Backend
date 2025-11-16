@@ -23,7 +23,8 @@ const userSchema = new mongoose.Schema(
     bio: { type: String, default: "", trim: true },
     profilePic: { type: String, default: "" },
     coverImage: { type: String, default: "" },
-    status: { type: String, default: "", trim: true, maxlength: 32 }, // <-- ADD THIS
+    status: { type: String, default: "", trim: true, maxlength: 32 },
+    isVerified: { type: Boolean, default: false } // ADD THIS FIELD
   },
   { timestamps: true }
 );

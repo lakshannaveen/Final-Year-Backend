@@ -149,7 +149,7 @@ exports.getVerificationStatus = async (req, res) => {
   }
 };
 
-// Get all verification requests (for testing - no auth required)
+// Get all verification requests (for admin - include file URLs)
 exports.getAllVerifications = async (req, res) => {
   try {
     const verifications = await Verification.find()
@@ -165,7 +165,30 @@ exports.getAllVerifications = async (req, res) => {
   }
 };
 
-// Update verification status (for testing - no auth required)
+// Get verification details by ID (for admin - include file URLs)
+exports.getVerificationDetails = async (req, res) => {
+  try {
+    const { verificationId } = req.params;
+
+    const verification = await Verification.findById(verificationId)
+      .populate('user', 'username email serviceType profilePic');
+
+    if (!verification) {
+      return res.status(404).json({
+        errors: { message: 'Verification request not found' }
+      });
+    }
+
+    res.status(200).json({ verification });
+  } catch (err) {
+    console.error('Get verification details error:', err);
+    res.status(500).json({
+      errors: { server: 'Server error' }
+    });
+  }
+};
+
+// Update verification status (for admin)
 exports.updateVerificationStatus = async (req, res) => {
   try {
     const { verificationId } = req.params;

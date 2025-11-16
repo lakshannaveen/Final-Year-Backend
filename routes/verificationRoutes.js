@@ -4,6 +4,7 @@ const {
   submitVerification,
   getVerificationStatus,
   getAllVerifications,
+  getVerificationDetails,
   updateVerificationStatus
 } = require('../controllers/verificationController');
 const { requireAuth } = require('../middleware/auth');
@@ -32,8 +33,9 @@ router.post('/submit',
 
 router.get('/status', requireAuth, getVerificationStatus);
 
-// Testing routes (no auth required for development)
+// Admin routes (no auth required for development - add auth in production)
 router.get('/all', getAllVerifications);
+router.get('/:verificationId', getVerificationDetails);
 router.put('/:verificationId', updateVerificationStatus);
 
 module.exports = router;

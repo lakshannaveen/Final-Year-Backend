@@ -100,9 +100,17 @@ app.use('/api/contact', require('./routes/contactRoutes'));
 app.use('/api/admin/manage', require('./routes/manageServiceRoutes'));
 app.use('/api/verify', require('./routes/verificationRoutes'));
 
-// Root route — simple health check message for backend URL
+// Root route
 app.get('/', (req, res) => {
-  res.status(200).send('Backend running');
+  console.log('✅ Root route accessed');
+
+  res.status(200).json({
+    message: 'Server is running successfully!',
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    port: process.env.PORT,
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
 // Catch-all for unmatched routes (fixed — no "*")

@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Final Year Backend Project",
   "dependencies": {
     "backblaze-b2": "^1.7.1",
     "bcrypt": "^6.0.0",

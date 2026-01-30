@@ -94,6 +94,10 @@ io.on("connection", (socket) => {
 });
 
 // Routes
+app.get('/', (req, res) => {
+  res.send('Server is running!');
+});
+
 app.use('/api/auth', require('./routes/userRoutes'));
 app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/feed', require('./routes/feedRoutes'));

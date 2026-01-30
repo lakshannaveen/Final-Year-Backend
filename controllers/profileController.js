@@ -8,6 +8,7 @@ const b2 = new B2({
   applicationKey: process.env.B2_APPLICATION_KEY,
 });
 
+
 // Get Profile
 exports.getProfile = async (req, res) => {
   try {
@@ -20,7 +21,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// Update Profile, including username
+// Update Profile, including username and status
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -29,7 +30,7 @@ exports.updateProfile = async (req, res) => {
     const current = await User.findById(userId).select('serviceType username');
     if (!current) return res.status(404).json({ errors: { user: 'User not found' } });
 
-    let { username, bio, profilePic, coverImage, phone, website } = req.body;
+    let { username, bio, profilePic, coverImage, phone, website, status } = req.body;
 
     // Validate username if present
     if (typeof username === 'string') {
@@ -48,6 +49,16 @@ exports.updateProfile = async (req, res) => {
       username = undefined;
     }
 
+    // Validate status (if present):
+    if (typeof status === 'string') {
+      status = status.trim();
+      if (status.length > 32) {
+        return res.status(400).json({ errors: { status: 'Status must be 32 characters or less.' } });
+      }
+    } else {
+      status = undefined;
+    }
+
     // If the user is not a posting account, ignore phone, website, and cover updates
     if (current.serviceType !== 'posting') {
       phone = undefined;
@@ -63,7 +74,7 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    const update = { username, bio, profilePic, coverImage, phone, website };
+    const update = { username, bio, profilePic, coverImage, phone, website, status };
     // remove undefined keys to avoid overwriting unintentionally
     for (const key in update) {
       if (update[key] === undefined) delete update[key];

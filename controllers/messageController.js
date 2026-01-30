@@ -26,9 +26,9 @@ exports.sendMessage = (io) => async (req, res) => {
       read: false
     });
 
-    // Populate sender and recipient details
-    await message.populate("sender", "username profilePic");
-    await message.populate("recipient", "username profilePic");
+    // Populate sender and recipient details with status
+    await message.populate("sender", "username profilePic status");
+    await message.populate("recipient", "username profilePic status");
 
     // Format for frontend
     const formatted = {
@@ -36,8 +36,11 @@ exports.sendMessage = (io) => async (req, res) => {
       sender: message.sender.username,
       senderId: message.sender._id.toString(),
       senderProfilePic: message.sender.profilePic,
+      senderStatus: message.sender.status || "", // <-- add status
       recipientId: message.recipient._id.toString(),
       recipientUsername: message.recipient.username,
+      recipientProfilePic: message.recipient.profilePic,
+      recipientStatus: message.recipient.status || "", // <-- add status
       postId: message.postId,
       text: message.text,
       read: message.read,
@@ -93,8 +96,8 @@ exports.getMessages = async (req, res) => {
       .sort({ createdAt: -1 }) // Get latest messages first for pagination
       .skip(skip)
       .limit(limitNum)
-      .populate("sender", "username profilePic")
-      .populate("recipient", "username profilePic")
+      .populate("sender", "username profilePic status")
+      .populate("recipient", "username profilePic status")
       .lean();
 
     // Reverse to show oldest first in UI
@@ -105,8 +108,11 @@ exports.getMessages = async (req, res) => {
       sender: msg.sender._id.toString() === userId ? "me" : msg.sender.username,
       senderId: msg.sender._id.toString(),
       senderProfilePic: msg.sender.profilePic,
+      senderStatus: msg.sender.status || "",
       recipientId: msg.recipient._id.toString(),
       recipientUsername: msg.recipient.username,
+      recipientProfilePic: msg.recipient.profilePic,
+      recipientStatus: msg.recipient.status || "",
       postId: msg.postId,
       text: msg.text,
       read: msg.read,
@@ -134,15 +140,16 @@ exports.getInbox = async (req, res) => {
       $or: [{ sender: userId }, { recipient: userId }]
     })
       .sort({ createdAt: -1 })
-      .populate("sender", "username profilePic")
-      .populate("recipient", "username profilePic");
+      .populate("sender", "username profilePic status")
+      .populate("recipient", "username profilePic status");
 
     // Group by the OTHER user in each message and count unread
     const chatMap = new Map();
     const unreadCountsMap = new Map();
 
     messages.forEach((msg) => {
-      const otherUser = msg.sender._id.toString() === userId ? msg.recipient : msg.sender;
+      const isSender = msg.sender._id.toString() === userId;
+      const otherUser = isSender ? msg.recipient : msg.sender;
       const key = otherUser._id.toString();
       
       // Count unread messages for this chat
@@ -156,6 +163,7 @@ exports.getInbox = async (req, res) => {
           recipientId: otherUser._id.toString(),
           recipientUsername: otherUser.username,
           recipientProfilePic: otherUser.profilePic,
+          recipientStatus: otherUser.status || "", // <-- add status
           lastMessage: msg.text,
           lastMessageTime: msg.createdAt,
           unreadCount: unreadCountsMap.get(key) || 0
@@ -196,8 +204,8 @@ exports.markAsRead = async (req, res) => {
     const userId = req.user.id;
 
     const message = await Message.findById(messageId)
-      .populate("sender", "username profilePic")
-      .populate("recipient", "username profilePic");
+      .populate("sender", "username profilePic status")
+      .populate("recipient", "username profilePic status");
 
     if (!message) {
       return res.status(404).json({ error: "Message not found" });

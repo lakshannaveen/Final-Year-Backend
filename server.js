@@ -25,12 +25,16 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-mongoose.connect(process.env.MONGO_URI , {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('✅ MongoDB connected successfully'))
-.catch(err => console.error('❌ MongoDB connection error:', err));
+if (process.env.MONGO_URI) {
+  mongoose.connect(process.env.MONGO_URI , {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log('✅ MongoDB connected successfully'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+} else {
+  console.log('⚠️ MONGO_URI not set, skipping MongoDB connection');
+}
 
 // Make io accessible to routes
 app.set('io', io);

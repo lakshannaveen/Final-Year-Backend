@@ -153,31 +153,32 @@ exports.getCurrentUser = async (req, res) => {
 // Google OAuth
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.API_URL
-        ? `${process.env.API_URL}/api/auth/google/callback`
-        : "http://localhost:5000/api/auth/google/callback",
-      passReqToCallback: true,
-    },
-    async function (req, accessToken, refreshToken, profile, done) {
-      try {
-        const serviceType = req.query.state || req.query.serviceType || "serviceSeeker";
-        // Block Google login/register if email used for another type
-        const existingUserByEmail = await User.findOne({ email: profile.emails[0].value });
-        if (existingUserByEmail && existingUserByEmail.serviceType !== serviceType) {
-          return done(
-            { message: "This email is already used for another account type." },
-            null
-          );
-        }
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.API_URL
+          ? `${process.env.API_URL}/api/auth/google/callback`
+          : "http://localhost:5000/api/auth/google/callback",
+        passReqToCallback: true,
+      },
+      async function (req, accessToken, refreshToken, profile, done) {
+        try {
+          const serviceType = req.query.state || req.query.serviceType || "serviceSeeker";
+          // Block Google login/register if email used for another type
+          const existingUserByEmail = await User.findOne({ email: profile.emails[0].value });
+          if (existingUserByEmail && existingUserByEmail.serviceType !== serviceType) {
+            return done(
+              { message: "This email is already used for another account type." },
+              null
+            );
+          }
 
-        let user = await User.findOne({ googleId: profile.id });
+          let user = await User.findOne({ googleId: profile.id });
 
-        if (!user) {
+          if (!user) {
           if (existingUserByEmail) {
             user = existingUserByEmail;
             user.googleId = profile.id;
@@ -205,6 +206,7 @@ passport.use(
     }
   )
 );
+} // Close the if block
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -218,6 +220,9 @@ exports.googleAuth = passport.authenticate("google", { scope: ["profile", "email
 
 exports.googleCallback = [
   function (req, res, next) {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      return res.status(500).json({ error: "Google authentication not configured" });
+    }
     passport.authenticate("google", function (err, user) {
       if (err && err.message) {
         // Redirect to client with error

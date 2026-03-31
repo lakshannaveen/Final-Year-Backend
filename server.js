@@ -103,7 +103,7 @@ app.use('/api/report', require('./routes/reportRoutes'));
 
 // Root route
 app.get('/', (req, res) => {
-  console.log('✅ Root route accessed');
+  console.log('Root route accessed');
 
   res.status(200).json({
     message: 'Server is running successfully!',
@@ -114,7 +114,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Catch-all for unmatched routes (fixed — no "*")
+// Catch-all for unmatched routes
 app.use((req, res) => {
   res.status(404).json({
     error: 'Route not found',

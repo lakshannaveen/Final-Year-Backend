@@ -12,7 +12,7 @@ const {
 // Public routes
 router.post('/submit', submitContact);
 
-// Admin routes (no authentication for now as requested)
+// Admin routes (no authentication )
 router.get('/admin/contacts', getAllContacts);
 router.get('/admin/stats', getContactStats);
 router.get('/admin/:contactId', getContactById);

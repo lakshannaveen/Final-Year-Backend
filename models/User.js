@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
     profilePic: { type: String, default: "" },
     coverImage: { type: String, default: "" },
     status: { type: String, default: "", trim: true, maxlength: 32 },
-    isVerified: { type: Boolean, default: false } // ADD THIS FIELD
+    isVerified: { type: Boolean, default: false } 
   },
   { timestamps: true }
 );

@@ -1,4 +1,10 @@
 const User = require('../models/User');
+const Feed = require('../models/Feed');
+const Review = require('../models/Review');
+const Message = require('../models/Message');
+const Feedback = require('../models/Feedback');
+const Report = require('../models/Report');
+const Verification = require('../models/Verification');
 const B2 = require('backblaze-b2');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -152,5 +158,31 @@ exports.getPublicProfile = async (req, res) => {
     res.status(200).json({ user });
   } catch (err) {
     res.status(500).json({ errors: { server: 'Server error' } });
+  }
+};
+
+// Delete Account (hard delete)
+exports.deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ errors: { user: 'User not found' } });
+
+    await Promise.all([
+      Feed.deleteMany({ user: userId }),
+      Review.deleteMany({ $or: [{ reviewerId: userId }, { reviewedUserId: userId }] }),
+      Message.deleteMany({ $or: [{ sender: userId }, { recipient: userId }] }),
+      Feedback.deleteMany({ user: userId }),
+      Report.deleteMany({ reporter: userId }),
+      Verification.deleteMany({ user: userId }),
+    ]);
+
+    await User.findByIdAndDelete(userId);
+
+    res.status(200).json({ message: 'Account deleted successfully' });
+  } catch (err) {
+    console.error('Delete account error:', err);
+    res.status(500).json({ errors: { server: 'Failed to delete account' } });
   }
 };

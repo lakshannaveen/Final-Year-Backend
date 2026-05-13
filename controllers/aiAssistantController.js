@@ -205,17 +205,13 @@ const DOOP_KNOWLEDGE_BASE = {
   }
 };
 
+const isCasualPrompt = (prompt) => {
+  const lowerPrompt = prompt.toLowerCase().trim();
+  return /(hi|hello|hey|greetings|thanks|thank you|appreciate|bye|goodbye|see you|how are you|whats up|what's up)\b/.test(lowerPrompt);
+};
+
 const generateDoopResponse = (prompt, context = []) => {
   const lowerPrompt = prompt.toLowerCase().trim();
-  if (lowerPrompt.match(/(hi|hello|hey|greetings)/)) {
-    return "Hello! 👋 I'm your Doop AI assistant. I can help you with information about our platform, services, booking process, becoming a provider, and more! What would you like to know?";
-  }
-  if (lowerPrompt.match(/(thanks|thank you|appreciate)/)) {
-    return "You're welcome! 😊 Is there anything else about Doop you'd like to know?";
-  }
-  if (lowerPrompt.match(/(bye|goodbye|see you)/)) {
-    return "Goodbye! 👋 Thank you for using Doop. Have a great day!";
-  }
   for (const [keyword, knowledge] of Object.entries(DOOP_KNOWLEDGE_BASE)) {
     if (lowerPrompt.includes(keyword) ||
         keyword.split(' ').some(word => lowerPrompt.includes(word))) {
@@ -267,6 +263,7 @@ exports.chatWithAI = async (req, res) => {
       });
     }
     const cleanPrompt = prompt.trim();
+    const casualIntent = isCasualPrompt(cleanPrompt);
     let answer = "";
     let source = "doop_knowledge";
     let suggestions = [];
@@ -322,7 +319,7 @@ exports.chatWithAI = async (req, res) => {
     }
 
     // Try Doop knowledge base first
-    const doopResponse = generateDoopResponse(cleanPrompt, context);
+    const doopResponse = casualIntent ? null : generateDoopResponse(cleanPrompt, context);
     if (doopResponse) {
       answer = doopResponse;
     } else if (!serviceIntent) {

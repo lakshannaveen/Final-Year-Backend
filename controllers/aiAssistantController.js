@@ -435,9 +435,10 @@ exports.chatWithAI = async (req, res) => {
       };
     }
 
-    // Try Doop knowledge base first
-    const doopResponse = casualIntent ? null : generateDoopResponse(cleanPrompt, context);
+    // Try Doop knowledge base first for any Doop-related question
+    const doopResponse = generateDoopResponse(cleanPrompt, context);
     if (doopResponse) {
+      debugAi('Doop hardcoded response used', { query: cleanPrompt.slice(0, 80) });
       answer = doopResponse;
     } else if (casualIntent) {
       try {

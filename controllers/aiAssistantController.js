@@ -1,4 +1,4 @@
-const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const Feed = require('../models/Feed');
 const User = require('../models/User');
 const dotenv = require('dotenv');
@@ -60,8 +60,14 @@ function isServiceIntent(prompt) {
 }
 
 // --- SHARED SEARCH LOGIC (as in searchController) ---
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const fetch = global.fetch || require('node-fetch');
+const debugAi = (...args) => console.log('[aiAssistantController]', ...args);
+const GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-flash'
+];
 const SERVICE_TYPES = [
   "plumber", "electrician", "carpenter", "cleaner", "repair",
   "gardener", "driver", "mechanic", "chef", "babysitter"
@@ -120,18 +126,18 @@ async function smartFeedSearch(query, limit = 20) {
     .populate("user", "username profilePic location serviceType status");
 }
 
-async function deepseekAISearch(query, limit = 15) {
-  if (!DEEPSEEK_API_KEY) return [];
+async function groqAISearch(query, limit = 15) {
+  if (!GROQ_API_KEY) return [];
   const feeds = await Feed.find({}).limit(200).populate("user", "username profilePic location serviceType status");
   const documents = feeds.map(feed => ({
     id: feed._id.toString(),
     text: `${feed.title} ${feed.description} ${feed.location} ${feed.user?.serviceType || ""} ${feed.user?.username || ""}`,
   }));
   try {
-    const deepseekRes = await fetch("https://api.deepseek.com/v1/search", {
+    const groqRes = await fetch("https://api.groq.ai/v1/search", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${DEEPSEEK_API_KEY}`,
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -140,9 +146,13 @@ async function deepseekAISearch(query, limit = 15) {
         limit,
       }),
     });
-    const deepseekData = await deepseekRes.json();
-    if (!deepseekRes.ok || !deepseekData.results) return [];
-    const resultIds = deepseekData.results.map(r => r.id);
+    const groqData = await groqRes.json();
+    if (!groqRes.ok || !groqData.results) {
+      debugAi('Groq search failed', { ok: groqRes.ok, hasResults: !!groqData.results });
+      return [];
+    }
+    debugAi('Groq search succeeded', { query: query.slice(0, 80), results: groqData.results.length });
+    const resultIds = groqData.results.map(r => r.id);
     const matchedFeeds = feeds.filter(feed => resultIds.includes(feed._id.toString()));
     return matchedFeeds.map(feed => ({
       ...feed._doc,
@@ -158,6 +168,108 @@ async function deepseekAISearch(query, limit = 15) {
   } catch (err) {
     return [];
   }
+}
+
+async function callGemini(promptText) {
+  const enhancedPrompt = `You are Doop AI assistant for a service marketplace platform. 
+Answer this user question helpfully and conversationally: "${promptText}"
+If it's about service marketplaces, local services, or online platforms, provide informative advice.
+Keep responses under 300 characters and be friendly.`;
+
+  for (const model of GEMINI_MODELS) {
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiRes = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: enhancedPrompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 300
+        }
+      })
+    });
+
+    if (geminiRes.ok) {
+      const data = await geminiRes.json();
+      const candidateText = data?.candidates?.[0]?.content?.parts?.map((part) => part.text).filter(Boolean).join(" ")
+        || data?.candidates?.[0]?.output
+        || data?.candidates?.[0]?.content;
+
+      if (candidateText) {
+        debugAi('Gemini API succeeded', { model, preview: candidateText.slice(0, 80) });
+        return { text: candidateText.trim(), model };
+      }
+
+      debugAi('Gemini API returned no text', { model });
+      continue;
+    }
+
+    const errorBody = await geminiRes.text();
+    debugAi('Gemini API request failed', {
+      model,
+      status: geminiRes.status,
+      body: errorBody.slice(0, 300)
+    });
+
+    if (geminiRes.status !== 404) {
+      break;
+    }
+  }
+
+  return null;
+}
+
+async function callGroq(promptText, mode = "casual") {
+  if (!GROQ_API_KEY) {
+    debugAi('Groq API key missing');
+    return null;
+  }
+
+  const systemPrompt = mode === "casual"
+    ? "You are a friendly, concise casual chatbot. Reply naturally in a short conversational style."
+    : "You are Doop AI assistant for a service marketplace platform. Keep responses helpful, concise, and focused on Doop.";
+
+  const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GROQ_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: promptText }
+      ],
+      temperature: 0.7,
+      max_tokens: 300
+    })
+  });
+
+  if (!groqRes.ok) {
+    const errorBody = await groqRes.text();
+    debugAi('Groq chat request failed', {
+      status: groqRes.status,
+      body: errorBody.slice(0, 300)
+    });
+    return null;
+  }
+
+  const data = await groqRes.json();
+  const text = data?.choices?.[0]?.message?.content?.trim();
+  if (!text) {
+    debugAi('Groq chat returned no text');
+    return null;
+  }
+
+  debugAi('Groq chat succeeded', { preview: text.slice(0, 80) });
+  return text;
 }
 
 // ---- AI ASSISTANT CONTROLLER ----
@@ -235,7 +347,8 @@ const generateDoopResponse = (prompt, context = []) => {
 
 exports.chatWithAI = async (req, res) => {
   try {
-    if (!HUGGINGFACE_API_KEY) {
+    if (!GEMINI_API_KEY && !GROQ_API_KEY) {
+      debugAi('Both Gemini and Groq API keys are missing');
       return res.status(503).json({
         error: "AI service is currently unavailable. Please try again later.",
         uses: 0,
@@ -275,6 +388,7 @@ exports.chatWithAI = async (req, res) => {
       // Use same as searchFeeds
       const terms = extractServiceTerms(cleanPrompt);
       const effectiveQuery = terms.length ? terms.join(" ") : cleanPrompt;
+      debugAi('Service query detected', { query: cleanPrompt.slice(0, 80), effectiveQuery });
       // 1. Smart keyword search
       let feeds = await smartFeedSearch(effectiveQuery, 20);
       feeds = feeds.map(feed => ({
@@ -288,10 +402,13 @@ exports.chatWithAI = async (req, res) => {
           status: feed.user.status || "" // <-- ADD THIS
         } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
       }));
-      // 2. DeepSeek AI search (optional, only if API enabled)
+      // 2. Groq AI search (optional, only if API enabled)
       let aiFeeds = [];
-      if (DEEPSEEK_API_KEY) {
-        aiFeeds = await deepseekAISearch(effectiveQuery, 15);
+      if (GROQ_API_KEY) {
+        aiFeeds = await groqAISearch(effectiveQuery, 15);
+        debugAi('Groq API used for service search', { matchedFeeds: aiFeeds.length });
+      } else {
+        debugAi('Groq API key missing, skipping AI search');
       }
       // Merge and dedupe
       const seen = new Set();
@@ -322,45 +439,60 @@ exports.chatWithAI = async (req, res) => {
     const doopResponse = casualIntent ? null : generateDoopResponse(cleanPrompt, context);
     if (doopResponse) {
       answer = doopResponse;
-    } else if (!serviceIntent) {
-      // Use HuggingFace for other questions with Doop context
+    } else if (casualIntent) {
       try {
-        const enhancedPrompt = `You are Doop AI assistant for a service marketplace platform. 
-        Answer this user question helpfully and conversationally: "${cleanPrompt}"
-        If it's about service marketplaces, local services, or online platforms, provide informative advice.
-        Keep responses under 300 characters and be friendly.`;
-        const hfResponse = await fetch(
-          "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium",
-          {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${HUGGINGFACE_API_KEY}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              inputs: enhancedPrompt,
-              parameters: {
-                max_length: 300,
-                temperature: 0.7,
-                do_sample: true
-              }
-            })
-          }
-        );
-        if (hfResponse.ok) {
-          const data = await hfResponse.json();
-          if (data[0]?.generated_text) {
-            answer = data[0].generated_text.replace(enhancedPrompt, '').trim();
-            source = "ai_model";
+        debugAi('Groq request started for casual prompt', { query: cleanPrompt.slice(0, 80) });
+        const groqAnswer = await callGroq(cleanPrompt, "casual");
+        if (groqAnswer) {
+          answer = groqAnswer;
+          source = "groq_model";
+        }
+        if (!answer) {
+          debugAi('Groq fallback used');
+          answer = `I understand you're asking about "${cleanPrompt}". I’m here if you want help with Doop services, bookings, providers, or anything casual.`;
+          source = "fallback";
+        }
+      } catch (groqError) {
+        debugAi('Groq casual request errored', { message: groqError?.message || String(groqError) });
+        answer = `I understand you're asking about "${cleanPrompt}". I’m here if you want help with Doop services, bookings, providers, or anything casual.`;
+        source = "error_fallback";
+      }
+    } else if (!serviceIntent) {
+      // Use Gemini for Doop-related questions, but fall back to Groq if Gemini is rate-limited or unavailable
+      try {
+        debugAi('Gemini request started', { query: cleanPrompt.slice(0, 80) });
+        const geminiResult = await callGemini(cleanPrompt);
+        if (geminiResult?.text) {
+          answer = geminiResult.text;
+          source = "ai_model";
+          debugAi('Gemini model selected', { model: geminiResult.model });
+        }
+        if (!answer && GROQ_API_KEY) {
+          debugAi('Gemini failed, trying Groq fallback', { query: cleanPrompt.slice(0, 80) });
+          const groqAnswer = await callGroq(cleanPrompt, "doop");
+          if (groqAnswer) {
+            answer = groqAnswer;
+            source = "groq_model";
           }
         }
         if (!answer) {
+          debugAi('Gemini fallback used');
           answer = `I understand you're asking about "${cleanPrompt}". As the Doop AI assistant, I'm here to help with service marketplace questions, booking information, provider details, and platform features. Could you rephrase your question or ask something specific about Doop services?`;
           source = "fallback";
         }
       } catch (hfError) {
-        answer = `I understand you're asking about "${cleanPrompt}". While I specialize in Doop platform questions, I'd be happy to help! You can ask me about service bookings, provider information, platform features, or general service marketplace topics.`;
-        source = "error_fallback";
+        debugAi('Gemini request errored', { message: hfError?.message || String(hfError) });
+        if (GROQ_API_KEY) {
+          const groqAnswer = await callGroq(cleanPrompt, "doop");
+          if (groqAnswer) {
+            answer = groqAnswer;
+            source = "groq_model";
+          }
+        }
+        if (!answer) {
+          answer = `I understand you're asking about "${cleanPrompt}". While I specialize in Doop platform questions, I'd be happy to help! You can ask me about service bookings, provider information, platform features, or general service marketplace topics.`;
+          source = "error_fallback";
+        }
       }
     } else if (!answer) {
       answer = "Here are service providers matching your request:";

@@ -3,8 +3,9 @@ const User = require('../models/User');
 const dotenv = require('dotenv');
 dotenv.config();
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const fetch = global.fetch || require('node-fetch'); // For Node < 18
+const debugSearch = (...args) => console.log('[searchController]', ...args);
 const SERVICE_TYPES = [
   "plumber", "electrician", "carpenter", "cleaner", "repair",
   "gardener", "driver", "mechanic", "chef", "babysitter"
@@ -63,18 +64,21 @@ async function smartFeedSearch(query, limit = 20) {
     .populate("user", "username profilePic location serviceType status");
 }
 
-async function deepseekAISearch(query, limit = 15) {
-  if (!DEEPSEEK_API_KEY) return [];
+async function groqAISearch(query, limit = 15) {
+  if (!GROQ_API_KEY) {
+    debugSearch('Groq API key missing, skipping AI search');
+    return [];
+  }
   const feeds = await Feed.find({}).limit(200).populate("user", "username profilePic location serviceType status");
   const documents = feeds.map(feed => ({
     id: feed._id.toString(),
     text: `${feed.title} ${feed.description} ${feed.location} ${feed.user?.serviceType || ""} ${feed.user?.username || ""}`,
   }));
   try {
-    const deepseekRes = await fetch("https://api.deepseek.com/v1/search", {
+    const groqRes = await fetch("https://api.groq.ai/v1/search", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${DEEPSEEK_API_KEY}`,
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -83,9 +87,13 @@ async function deepseekAISearch(query, limit = 15) {
         limit,
       }),
     });
-    const deepseekData = await deepseekRes.json();
-    if (!deepseekRes.ok || !deepseekData.results) return [];
-    const resultIds = deepseekData.results.map(r => r.id);
+    const groqData = await groqRes.json();
+    if (!groqRes.ok || !groqData.results) {
+      debugSearch('Groq AI search failed', { ok: groqRes.ok, hasResults: !!groqData.results });
+      return [];
+    }
+    debugSearch('Groq AI search succeeded', { query: query.slice(0, 80), results: groqData.results.length });
+    const resultIds = groqData.results.map(r => r.id);
     const matchedFeeds = feeds.filter(feed => resultIds.includes(feed._id.toString()));
     return matchedFeeds.map(feed => ({
       ...feed._doc,
@@ -155,8 +163,9 @@ exports.searchFeeds = async (req, res) => {
       } : { _id: "", username: "", profilePic: "", location: "", serviceType: "", status: "" }
     }));
 
-    // 2. DeepSeek AI search (always try)
-    const aiFeeds = await deepseekAISearch(query, 15);
+    // 2. Groq AI search (always try)
+    const aiFeeds = await groqAISearch(query, 15);
+    debugSearch('Groq AI search completed', { matchedFeeds: aiFeeds.length });
 
     // 3. Merge (dedupe, prioritize nearYou)
     const seen = new Set();
@@ -222,5 +231,6 @@ exports.getSearchSuggestions = async (req, res) => {
 };
 
 exports.checkAIService = async (req, res) => {
-  res.status(200).json({ available: !!DEEPSEEK_API_KEY, message: "AI service check" });
+  debugSearch('AI service check', { available: !!GROQ_API_KEY });
+  res.status(200).json({ available: !!GROQ_API_KEY, message: "AI service check" });
 };

@@ -14,8 +14,8 @@ router.post('/submit', requireAuth, submitFeedback);
 
 // Admin routes (require authentication)
 router.get('/admin/feedbacks', getAllFeedbacks);
-router.get('/admin/stats', requireAuth, getFeedbackStats);
-router.put('/admin/:feedbackId/status', requireAuth, updateFeedbackStatus);
-router.delete('/admin/:feedbackId', requireAuth, deleteFeedback);
+router.get('/admin/stats',getFeedbackStats);
+router.put('/admin/:feedbackId/status',updateFeedbackStatus);
+router.delete('/admin/:feedbackId',deleteFeedback);
 
 module.exports = router;

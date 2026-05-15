@@ -13,7 +13,7 @@ const { requireAuth } = require('../middleware/auth');
 router.post('/submit', requireAuth, submitFeedback);
 
 // Admin routes (require authentication)
-router.get('/admin/feedbacks', requireAuth, getAllFeedbacks);
+router.get('/admin/feedbacks', getAllFeedbacks);
 router.get('/admin/stats', requireAuth, getFeedbackStats);
 router.put('/admin/:feedbackId/status', requireAuth, updateFeedbackStatus);
 router.delete('/admin/:feedbackId', requireAuth, deleteFeedback);

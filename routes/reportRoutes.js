@@ -12,7 +12,7 @@ const { requireAuth } = require('../middleware/auth');
 router.post('/', requireAuth, createReport);
 
 // Admin routes
-router.get('/admin', requireAuth, getAllReports);
+router.get('/admin', getAllReports);
 router.put('/admin/:reportId/status', requireAuth, updateReportStatus);
 router.delete('/admin/:reportId', requireAuth, deleteReport);
 
